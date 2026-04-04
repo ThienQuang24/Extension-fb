@@ -1,0 +1,1334 @@
+{
+  "id": "rec_1773150158620",
+  "startTime": 1773150079066,
+  "endTime": 1773150158620,
+  "url": "https://www.facebook.com/profile.php?id=100064243002619",
+  "title": "Facebook",
+  "steps": [
+    {
+      "step": 1,
+      "timestamp": 1773150082085,
+      "action": "click",
+      "target": {
+        "tagName": "SPAN",
+        "text": "Bạn đang nghĩ gì?",
+        "className": "x1lliihq x6ikm8r x10wlt62 x1n2onr6",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[4",
+        "rect": {
+          "x": 942,
+          "y": 193,
+          "w": 486,
+          "h": 23
+        },
+        "attributes": {},
+        "parentClass": "xi81zsa x1lkfr7t xkjl1po x1mzt3pk xh8yej3 x13faqbe",
+        "siblings": [
+          "Bạn đang nghĩ gì?"
+        ],
+        "dna": "page:span:Bạn đang nghĩ gì?"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3290,
+        "dialogCount": 0,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 2,
+      "timestamp": 1773150082654,
+      "action": "scroll",
+      "target": {
+        "tagName": "WINDOW",
+        "text": "",
+        "className": "",
+        "id": "",
+        "xpath": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1536,
+          "h": 774
+        },
+        "attributes": {
+          "scrollX": "0",
+          "scrollY": "0"
+        },
+        "parentClass": "",
+        "siblings": [],
+        "dna": "page:window:scroll"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3478,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 428
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 3,
+      "timestamp": 1773150086244,
+      "action": "click",
+      "target": {
+        "tagName": "P",
+        "text": "",
+        "className": "xdj266r x14z9mp xat24cr x1lziwak x16tdsg8",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 526,
+          "y": 309,
+          "w": 468,
+          "h": 28
+        },
+        "attributes": {},
+        "parentClass": "xzsf02u x1a2a7pz x1n2onr6 x14wi4xw x9f619 x1lliihq",
+        "siblings": [],
+        "dna": "dialog[0]:p:"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3478,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 428
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 4,
+      "timestamp": 1773150094203,
+      "action": "click",
+      "target": {
+        "tagName": "IMG",
+        "text": "",
+        "className": "x1b0d499 xl1xv1r",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 754,
+          "y": 492,
+          "w": 24,
+          "h": 24
+        },
+        "attributes": {},
+        "parentClass": "x6s0dn4 x78zum5 xl56j7k x1n2onr6 x5yr21d xh8yej3",
+        "siblings": [],
+        "dna": "dialog[0]:img:"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3489,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 428
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 5,
+      "timestamp": 1773150094207,
+      "action": "click",
+      "target": {
+        "tagName": "INPUT",
+        "text": "",
+        "className": "x1s85apg",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "attributes": {
+          "type": "file"
+        },
+        "parentClass": "xr9ek0c xnnr8r xjpr12u xwklpps",
+        "siblings": [],
+        "dna": "dialog[0]:file:"
+      },
+      "isFileUpload": true,
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3507,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 428
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 6,
+      "timestamp": 1773150096370,
+      "action": "type",
+      "target": {
+        "tagName": "INPUT",
+        "text": "",
+        "className": "x1s85apg",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0
+        },
+        "attributes": {
+          "type": "file"
+        },
+        "parentClass": "xr9ek0c xnnr8r xjpr12u xwklpps",
+        "siblings": [],
+        "dna": "dialog[0]:file:"
+      },
+      "value": "C:\\fakepath\\Jack-Nesty thang 3_Rendered.mp4",
+      "isDynamic": true,
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3494,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 428
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 173,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 7,
+      "timestamp": 1773150098289,
+      "action": "scroll",
+      "target": {
+        "tagName": "WINDOW",
+        "text": "",
+        "className": "",
+        "id": "",
+        "xpath": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1536,
+          "h": 774
+        },
+        "attributes": {
+          "scrollX": "0",
+          "scrollY": "0"
+        },
+        "parentClass": "",
+        "siblings": [],
+        "dna": "page:window:scroll"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3517,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 56,
+              "w": 500,
+              "h": 696
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 8,
+      "timestamp": 1773150099160,
+      "action": "click",
+      "target": {
+        "tagName": "DIV",
+        "text": "Tiếp",
+        "className": "html-div xdj266r xat24cr xexx8yu xyri2b x18d9i69 x1c1uobl x6s0dn4 x78zum5 xl56j7",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 535,
+          "y": 713,
+          "w": 450,
+          "h": 11
+        },
+        "attributes": {},
+        "parentClass": "x1ja2u2z x78zum5 x2lah0s x1n2onr6 xl56j7k x6s0dn4 ",
+        "siblings": [
+          "Tiếp"
+        ],
+        "dna": "dialog[0]:div:Tiếp"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3517,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Công khai",
+              "Thêm vào bài viết của bạn",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 510,
+              "y": 56,
+              "w": 500,
+              "h": 696
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 510,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 9,
+      "timestamp": 1773150102568,
+      "action": "click",
+      "target": {
+        "tagName": "INPUT",
+        "text": "",
+        "className": "x1i10hfl xggy1nq xtpw4lu x1tutvks x1s3xk63 x1s07b3s x1kdt53j x1a2a7pz xjbqb8w x1",
+        "id": "_r_6j_",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 89,
+          "y": 134,
+          "w": 326,
+          "h": 56
+        },
+        "attributes": {
+          "type": "text",
+          "placeholder": "Tiêu đề thước phim"
+        },
+        "parentClass": "xjbqb8w x1iyjqo2 x193iq5w xeuugli x1n2onr6",
+        "siblings": [
+          "Tiêu đề thước phim"
+        ],
+        "dna": "dialog[0]:text:Tiêu đề thước phim"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3835,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Thu ngắn video",
+              "Phụ đề",
+              "Mô tả bằng âm thanh",
+              "Bản chép lời",
+              "Tối ưu hóa",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file",
+              "Tiêu đề thước phim",
+              "search"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 10,
+      "timestamp": 1773150104264,
+      "action": "type",
+      "target": {
+        "tagName": "INPUT",
+        "text": "",
+        "className": "x1i10hfl xggy1nq xtpw4lu x1tutvks x1s3xk63 x1s07b3s x1kdt53j x1a2a7pz xjbqb8w x1",
+        "id": "_r_6j_",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 89,
+          "y": 134,
+          "w": 326,
+          "h": 56
+        },
+        "attributes": {
+          "type": "text",
+          "placeholder": "Tiêu đề thước phim"
+        },
+        "parentClass": "xjbqb8w x1iyjqo2 x193iq5w xeuugli x1n2onr6",
+        "siblings": [
+          "Tiêu đề thước phim"
+        ],
+        "dna": "dialog[0]:text:Tiêu đề thước phim"
+      },
+      "value": "Jack đã quay trở lại Nesty, mong chờ sự bùng nổ rực rỡ 2026.",
+      "isDynamic": true,
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3835,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Thu ngắn video",
+              "Phụ đề",
+              "Mô tả bằng âm thanh",
+              "Bản chép lời",
+              "Tối ưu hóa",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file",
+              "Tiêu đề thước phim",
+              "search"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 11,
+      "timestamp": 1773150104790,
+      "action": "scroll",
+      "target": {
+        "tagName": "WINDOW",
+        "text": "",
+        "className": "",
+        "id": "",
+        "xpath": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1536,
+          "h": 774
+        },
+        "attributes": {
+          "scrollX": "0",
+          "scrollY": "0"
+        },
+        "parentClass": "",
+        "siblings": [],
+        "dna": "page:window:scroll"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3838,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Thu ngắn video",
+              "Phụ đề",
+              "Mô tả bằng âm thanh",
+              "Bản chép lời",
+              "Tối ưu hóa",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file",
+              "Tiêu đề thước phim",
+              "search"
+            ],
+            "hasTarget": false,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 12,
+      "timestamp": 1773150110345,
+      "action": "click",
+      "target": {
+        "tagName": "SPAN",
+        "text": "Tiếp",
+        "className": "x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 237,
+          "y": 699,
+          "w": 29,
+          "h": 20
+        },
+        "attributes": {},
+        "parentClass": "x193iq5w xeuugli x13faqbe x1vvkbs x1xmvt09 x1lliih",
+        "siblings": [
+          "Tiếp"
+        ],
+        "dna": "dialog[0]:span:Tiếp"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3838,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Thu ngắn video",
+              "Phụ đề",
+              "Mô tả bằng âm thanh",
+              "Bản chép lời",
+              "Tối ưu hóa",
+              "Tiếp"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file",
+              "text",
+              "search"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 13,
+      "timestamp": 1773150110561,
+      "action": "scroll",
+      "target": {
+        "tagName": "WINDOW",
+        "text": "",
+        "className": "",
+        "id": "",
+        "xpath": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1536,
+          "h": 774
+        },
+        "attributes": {
+          "scrollX": "0",
+          "scrollY": "0"
+        },
+        "parentClass": "",
+        "siblings": [],
+        "dna": "page:window:scroll"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3730,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Lưu",
+              "Đăng"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file"
+            ],
+            "hasTarget": false,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 14,
+      "timestamp": 1773150119554,
+      "action": "click",
+      "target": {
+        "tagName": "SPAN",
+        "text": "Đăng",
+        "className": "x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/form[1]/div[",
+        "rect": {
+          "x": 321,
+          "y": 699,
+          "w": 36,
+          "h": 20
+        },
+        "attributes": {},
+        "parentClass": "x193iq5w xeuugli x13faqbe x1vvkbs x1xmvt09 x1lliih",
+        "siblings": [
+          "Đăng"
+        ],
+        "dna": "dialog[0]:span:Đăng"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3908,
+        "dialogCount": 2,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Chỉnh sửa",
+              "Đối tượng của bài viếtCôn",
+              "Remix và sử dụng âm thanh",
+              "Tìm hiểu thêm",
+              "Gắn thẻ và cộng tácGắn th",
+              "Lựa chọn lịch đăngĐăng ng",
+              "Chia sẻ lên nhómTiếp cận ",
+              "Lưu",
+              "Đăng"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file",
+              "Mô tả thước phim của bạn...",
+              "checkbox"
+            ],
+            "hasTarget": true,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 0
+      }
+    },
+    {
+      "step": 15,
+      "timestamp": 1773150124144,
+      "action": "click",
+      "target": {
+        "tagName": "SPAN",
+        "text": "Lúc khác",
+        "className": "x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[4]/div[1]/div[2]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[1]/div[1",
+        "rect": {
+          "x": 731,
+          "y": 578,
+          "w": 59,
+          "h": 20
+        },
+        "attributes": {},
+        "parentClass": "x193iq5w xeuugli x13faqbe x1vvkbs x1xmvt09 x1lliih",
+        "siblings": [
+          "Lúc khác"
+        ],
+        "dna": "dialog[2]:span:Lúc khác"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3995,
+        "dialogCount": 3,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Tạo bài viết",
+            "buttons": [
+              "Chỉnh sửa",
+              "Đối tượng của bài viếtCôn",
+              "Remix và sử dụng âm thanh",
+              "Tìm hiểu thêm",
+              "Gắn thẻ và cộng tácGắn th",
+              "Lựa chọn lịch đăngĐăng ng",
+              "Chia sẻ lên nhómTiếp cận ",
+              "Lưu",
+              "Đăng"
+            ],
+            "inputs": [
+              "Bạn đang nghĩ gì?",
+              "file",
+              "Mô tả thước phim của bạn...",
+              "checkbox"
+            ],
+            "hasTarget": false,
+            "rect": {
+              "x": 72,
+              "y": 56,
+              "w": 1377,
+              "h": 684
+            },
+            "zIndex": "0"
+          },
+          {
+            "index": 1,
+            "title": "Tạo bài viết",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": -428,
+              "y": 56,
+              "w": 500,
+              "h": 60
+            },
+            "zIndex": "auto"
+          },
+          {
+            "index": 2,
+            "title": "",
+            "buttons": [
+              "Thêm nút WhatsApp",
+              "Lúc khác"
+            ],
+            "inputs": [],
+            "hasTarget": true,
+            "rect": {
+              "x": 486,
+              "y": 155,
+              "w": 548,
+              "h": 464
+            },
+            "zIndex": "0"
+          }
+        ],
+        "targetLayer": "dialog",
+        "targetDialogIndex": 2
+      }
+    },
+    {
+      "step": 16,
+      "timestamp": 1773150129652,
+      "action": "scroll",
+      "target": {
+        "tagName": "WINDOW",
+        "text": "",
+        "className": "",
+        "id": "",
+        "xpath": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1536,
+          "h": 774
+        },
+        "attributes": {
+          "scrollX": "0",
+          "scrollY": "592"
+        },
+        "parentClass": "",
+        "siblings": [],
+        "dna": "page:window:scroll"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3468,
+        "dialogCount": 0,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 17,
+      "timestamp": 1773150150875,
+      "action": "click",
+      "target": {
+        "tagName": "path",
+        "text": "",
+        "className": "[object SVGAnimatedString]",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[5]/div[1]/div[3]/span[1]/span[1]/div[1]/div[1]/svg[1]/path[1]",
+        "rect": {
+          "x": 1428,
+          "y": 18,
+          "w": 18,
+          "h": 19
+        },
+        "attributes": {},
+        "parentClass": "[object SVGAnimatedString]",
+        "siblings": [],
+        "dna": "page:path:"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3821,
+        "dialogCount": 1,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Mới",
+            "buttons": [],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 18,
+      "timestamp": 1773150153574,
+      "action": "click",
+      "target": {
+        "tagName": "path",
+        "text": "",
+        "className": "[object SVGAnimatedString]",
+        "id": "",
+        "xpath": "/html[1]/body[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[5]/div[1]/div[3]/span[1]/span[1]/div[1]/div[1]/svg[1]/path[1]",
+        "rect": {
+          "x": 1428,
+          "y": 18,
+          "w": 18,
+          "h": 19
+        },
+        "attributes": {},
+        "parentClass": "[object SVGAnimatedString]",
+        "siblings": [],
+        "dna": "page:path:"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3805,
+        "dialogCount": 1,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [
+          {
+            "index": 0,
+            "title": "Mới",
+            "buttons": [
+              "Tất cả",
+              "Chưa đọc",
+              "Đánh dấu là đã đọc",
+              "Đánh dấu là đã đọc",
+              "Đánh dấu là đã đọc",
+              "Đánh dấu là đã đọc",
+              "Đánh dấu là đã đọc",
+              "Xem thông báo trước đó"
+            ],
+            "inputs": [],
+            "hasTarget": false,
+            "rect": {
+              "x": 1145,
+              "y": 53,
+              "w": 360,
+              "h": 647
+            },
+            "zIndex": "auto"
+          }
+        ],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 19,
+      "timestamp": 1773150156765,
+      "action": "scroll",
+      "target": {
+        "tagName": "WINDOW",
+        "text": "",
+        "className": "",
+        "id": "",
+        "xpath": "",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 1536,
+          "h": 774
+        },
+        "attributes": {
+          "scrollX": "0",
+          "scrollY": "592"
+        },
+        "parentClass": "",
+        "siblings": [],
+        "dna": "page:window:scroll"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3477,
+        "dialogCount": 0,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    },
+    {
+      "step": 20,
+      "timestamp": 1773150158618,
+      "action": "click",
+      "target": {
+        "tagName": "DIV",
+        "text": "",
+        "className": "",
+        "id": "hand-floating-panel-host",
+        "xpath": "/html[1]/div[1]",
+        "rect": {
+          "x": 0,
+          "y": 3733,
+          "w": 0,
+          "h": 0
+        },
+        "attributes": {},
+        "parentClass": "_9dls __fb-light-mode",
+        "siblings": [
+          "Facebook:root,.__fb-light",
+          "{\"require\":[[\"qplTimingsS"
+        ],
+        "dna": "page:div:"
+      },
+      "viewport": {
+        "w": 1536,
+        "h": 774
+      },
+      "domContext": {
+        "totalElements": 3477,
+        "dialogCount": 0,
+        "url": "https://www.facebook.com/profile.php?id=100064243002619",
+        "dialogStack": [],
+        "targetLayer": "page",
+        "targetDialogIndex": -1
+      }
+    }
+  ]
+}
