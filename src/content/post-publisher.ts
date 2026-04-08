@@ -108,20 +108,21 @@ class PostPublisher {
                         }
                     }
                 } else {
-                    const apiResult = await this.publishViaGraphQL(config, tokens)
-                    if (apiResult.success) {
-                        console.log('✨ [PUBLISH] API Published successfully. Completely silent.')
-
+                    // Use DOM instead of buggy GraphQL
+                    console.log('🖼️ [PUBLISH] Text/Image detected. Using Feed DOM flow.')
+                    const feedResult = await this.publishFeedDOM(config)
+                    if (feedResult.success) {
+                        console.log('✨ [PUBLISH] DOM Published successfully.')
                         this.currentStatus = {
                             status: 'success',
-                            data: { publishedUrl: apiResult.publishedUrl },
+                            data: { publishedUrl: feedResult.publishedUrl },
                             timestamp: Date.now()
                         }
                     } else {
-                        console.error(`❌ [PUBLISH] API Posting failed: ${apiResult.error}`)
+                        console.error(`❌ [PUBLISH] DOM Posting failed: ${feedResult.error}`)
                         this.currentStatus = {
                             status: 'failed',
-                            error: `Facebook API: ${apiResult.error}`,
+                            error: `Lỗi đăng bài DOM: ${feedResult.error}`,
                             timestamp: Date.now()
                         }
                     }
@@ -491,6 +492,232 @@ class PostPublisher {
         }
     }
 
+    private async publishFeedDOM(config: PublishConfig): Promise<{ success: boolean, publishedUrl?: string, error?: string }> {
+        try {
+            console.log('🚀 [Feed DOM] Starting DOM-based Feed Publish...')
+
+            // 1. Open Composer
+            let openBtn: HTMLElement | null = null;
+            const openTriggers = ['bạn đang nghĩ gì', "what's on your mind", "tạo bài viết", "create post"];
+            
+            // Ưu tiên tìm các thẻ đích thực sự có thể click được (chứa role="button" hoặc thẻ a)
+            const clickableCands = document.querySelectorAll('div[role="button"], a[role="link"], div.x1i10hfl');
+            for (const el of Array.from(clickableCands) as HTMLElement[]) {
+                if (el.offsetParent === null) continue;
+                const txt = el.innerText?.toLowerCase().trim() || '';
+                if (openTriggers.some(t => txt.includes(t))) {
+                    openBtn = el;
+                    break;
+                }
+            }
+
+            // Fallback
+            if (!openBtn) {
+                openBtn = this.findVisibleElementByText(['Bạn đang nghĩ gì', "What's on your mind", "Tạo bài viết", "Create post"]);
+            }
+
+            if (!openBtn) {
+                const triggers = FACEBOOK_SELECTORS.CREATE_POST_BUTTONS;
+                for (const sel of triggers) {
+                    const el = document.querySelector(sel) as HTMLElement;
+                    if (el && el.offsetParent !== null) { openBtn = el; break; }
+                }
+            }
+
+            if (!openBtn) throw new Error('Không tìm thấy nút tạo bài viết')
+            openBtn.click()
+            await this.wait(4000)
+
+            // 2. Type Caption (if any)
+            if (config.post.content) {
+                let editor: HTMLElement | null = null;
+                const dialogs = document.querySelectorAll('[role="dialog"]');
+                
+                // Khảo sát mọi ô thoại từ lớp trên cùng xuống dưới cùng để tìm editor hợp lệ
+                for (let i = dialogs.length - 1; i >= 0; i--) {
+                    const r = dialogs[i] as HTMLElement;
+                    editor = r.querySelector('div[contenteditable="true"][role="textbox"]') as HTMLElement
+                          || r.querySelector('div[contenteditable="true"]') as HTMLElement
+                          || r.querySelector('[data-lexical-editor="true"]') as HTMLElement
+                          || r.querySelector('p.xdj266r') as HTMLElement;
+                    if (editor) break;
+                }
+
+                if (editor) {
+                    editor.click();
+                    editor.focus();
+                    
+                    // Cách 1: Sử dụng PasteEvent (Tương thích tốt với Lexical)
+                    const dataTransfer = new DataTransfer()
+                    dataTransfer.setData('text/plain', config.post.content)
+                    const pasteEvent = new ClipboardEvent('paste', {
+                        clipboardData: dataTransfer,
+                        bubbles: true,
+                        cancelable: true
+                    })
+                    editor.dispatchEvent(pasteEvent)
+                    await this.wait(500)
+                    
+                    // Cách 2: Fallback to execCommand + InputEvent (Kích hoạt bộ đánh giá React)
+                    if (!editor.innerText || !editor.innerText.trim()) {
+                         document.execCommand('insertText', false, config.post.content);
+                         editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    await this.wait(2000)
+                } else {
+                    console.warn("⚠️ [Feed DOM] Không tìm thấy khung soạn thảo nội dung trong cửa sổ popup.");
+                }
+            }
+
+            // 3. Upload Images
+            if (config.post.images && config.post.images.length > 0) {
+                const checkDialogs = document.querySelectorAll('[role="dialog"]');
+                if (checkDialogs.length === 0) {
+                    throw new Error('Cửa sổ tạo bài viết chưa bật lên được, không thể tải ảnh!');
+                }
+                const addPhotoBtn = this.findVisibleElementByText(['Ảnh/video', 'Photo/Video', 'Photo/video', 'Ảnh', 'Photo'])
+                if (addPhotoBtn) {
+                    addPhotoBtn.click()
+                    await this.wait(2000)
+                }
+                const uploadSuccess = await this.injectImageFiles(config.post.images)
+                if (!uploadSuccess) throw new Error('Không thể tải ảnh lên')
+                console.log('⏳ [Feed DOM] Đang đợi xử lý ảnh...')
+                await this.wait(6000)
+            }
+
+            // 4. Kiểm tra nút "Tiếp" (trường hợp đăng trên Page cần 2 bước)
+            let nextBtn: HTMLElement | null = null;
+            const nextBtnSelectors = ['div[aria-label="Tiếp"]', 'div[aria-label="Next"]'];
+            for (const sel of nextBtnSelectors) {
+                const el = document.querySelector(sel) as HTMLElement;
+                if (el) { nextBtn = el; break; }
+            }
+            if (!nextBtn) {
+                 const buttons = document.querySelectorAll('div[role="button"]');
+                 for (const btn of Array.from(buttons) as HTMLElement[]) {
+                     const t = btn.innerText?.toLowerCase().trim() || '';
+                     if (t === 'tiếp' || t === 'next') {
+                         nextBtn = btn;
+                         break;
+                     }
+                 }
+            }
+            if (nextBtn) {
+                console.log('⏳ [Feed DOM] Tìm thấy nút Tiếp, đang click...');
+                nextBtn.click();
+                await this.wait(4000); // Chờ modal thứ 2 hiện ra
+            }
+
+            // 5. Click "Đăng"
+            let publishBtn: HTMLElement | null = null;
+            
+            // 4.1 Thử tìm qua aria-label trước vì chính xác nhất
+            const btnSelectors = [
+                'div[aria-label="Đăng"]', 'div[aria-label="Publish"]', 'div[aria-label="Post"]',
+                'div[aria-label="Chia sẻ"]', 'div[aria-label="Share"]'
+            ];
+            for (const sel of btnSelectors) {
+                const el = document.querySelector(sel) as HTMLElement;
+                if (el) { publishBtn = el; break; }
+            }
+
+            // 4.2 Nếu không tìm thấy, tìm qua text hiển thị
+            if (!publishBtn) {
+                publishBtn = this.findVisibleElementByText(['Đăng', 'Publish', 'Chia sẻ', 'Share', 'Post']);
+                // Loại trừ các trường hợp tìm nhầm (chứa từ khóa gây nhiễu)
+                if (publishBtn && publishBtn.innerText) {
+                    const txt = publishBtn.innerText.toLowerCase();
+                    if (txt.includes('đăng ký') || txt.includes('đăng xuất') || txt.includes('đăng nhập')) {
+                        publishBtn = null;
+                    }
+                }
+            }
+
+            // 4.3 Fallback cuối cùng vét cạn các phần tử có role="button"
+            if (!publishBtn) {
+                const buttons = document.querySelectorAll('div[role="button"]');
+                for (const btn of Array.from(buttons) as HTMLElement[]) {
+                    const t = btn.innerText?.toLowerCase().trim() || '';
+                    if (['đăng', 'post', 'publish', 'chia sẻ', 'chia sẻ ngay', 'share'].includes(t)) {
+                        publishBtn = btn;
+                        break;
+                    }
+                }
+            }
+
+            if (!publishBtn) throw new Error('Không tìm thấy nút Đăng bài (Đã thử mọi selector)')
+            
+            publishBtn.click()
+            
+            console.log('⏳ [Feed DOM] Đang xuất bản...')
+            await this.wait(12000)
+
+            // 5. Handle success
+            const dialogs = document.querySelectorAll('[role="dialog"]')
+            if (dialogs.length === 0) {
+                return { success: true }
+            }
+
+            const dismissBtn = this.findVisibleElementByText(['Lúc khác', 'Not now'])
+            if (dismissBtn) {
+                dismissBtn.click()
+                await this.wait(2000)
+            }
+
+            return { success: true }
+        } catch (e) {
+            console.error('💥 [Feed DOM] Exception:', e)
+            return { success: false, error: e instanceof Error ? e.message : 'Unknown' }
+        }
+    }
+
+    private async injectImageFiles(imageUrls: string[]): Promise<boolean> {
+        try {
+            console.log(`📥 [Feed] Tiêm ${imageUrls.length} ảnh`)
+            const dataTransfer = new DataTransfer()
+
+            for (const url of imageUrls) {
+                const response = await fetch(url)
+                const blob = await response.blob()
+                const filename = url.split('/').pop()?.split('?')[0] || 'image.jpg'
+                const file = new File([blob], filename, { type: blob.type || 'image/jpeg' })
+                dataTransfer.items.add(file)
+            }
+
+            const inputs = document.querySelectorAll('input[type="file"]')
+            let targetInput: HTMLInputElement | null = null
+
+            // Quét ngược từ dưới lên trên vì popup tạo bài viết luôn sinh ra input ảnh mới gắn vào cuối DOM.
+            // Nếu quét từ trên xuống sẽ lấy nhầm input thay ảnh bìa của trang.
+            for (const inp of Array.from(inputs).reverse() as HTMLInputElement[]) {
+                const accept = inp.getAttribute('accept') || ''
+                if (accept.includes('image')) {
+                    targetInput = inp
+                    break
+                }
+            }
+            if (!targetInput && inputs.length > 0) {
+                targetInput = inputs[inputs.length - 1] as HTMLInputElement
+            }
+            if (!targetInput) return false
+
+            const origAccept = targetInput.getAttribute('accept') || ''
+            if (!origAccept.includes('image')) {
+                targetInput.setAttribute('accept', origAccept + ',image/*,image/jpeg,image/png')
+            }
+
+            targetInput.files = dataTransfer.files
+            targetInput.dispatchEvent(new Event('change', { bubbles: true }))
+            targetInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+            return true
+        } catch (e) {
+            console.error('❌ [Feed] File injection error:', e)
+            return false
+        }
+    }
+
     private async injectVideoFile(videoUrl: string): Promise<boolean> {
         try {
             console.log(`📥 [Reels] Injecting video: ${videoUrl}`)
@@ -532,17 +759,22 @@ class PostPublisher {
 
     private findVisibleElementByText(texts: string[]): HTMLElement | null {
         const dialogs = document.querySelectorAll('[role="dialog"]')
-        const root = dialogs.length > 0 ? dialogs[0] : document.body
+        const root = dialogs.length > 0 ? dialogs[dialogs.length - 1] : document.body
 
         const candidates = root.querySelectorAll('span, div, button, [role="button"]')
-        for (const el of Array.from(candidates) as HTMLElement[]) {
-            if (el.offsetParent === null) continue
-            const t = el.innerText?.trim()
-            if (texts.some(txt => t === txt || t.includes(txt))) {
-                return el
+        // Lật ngược thứ tự để ưu tiên click vào phần tử con (sâu nhất) trước, tránh click nhầm vào các thẻ div bao bọc khổng lồ bên ngoài.
+        for (const el of Array.from(candidates).reverse() as HTMLElement[]) {
+            if (el.offsetParent === null) continue;
+            let t = el.innerText?.trim() || '';
+            let tLower = t.toLowerCase();
+            if (texts.some(txt => {
+                let txtLower = txt.toLowerCase();
+                return tLower === txtLower || tLower.includes(txtLower);
+            })) {
+                return el;
             }
         }
-        return null
+        return null;
     }
 
     private wait(ms: number): Promise<void> {

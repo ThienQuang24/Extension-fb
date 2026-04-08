@@ -324,9 +324,10 @@ async function handleStartSearch(data: any, senderTabId?: number): Promise<Messa
             // ALWAYS update tab URL to ensure content script starts on fresh search results
             if (data.keyword) {
                 console.log(`🚀 [SEARCH] Navigating tab ${tabId} to search for: ${data.keyword}`)
+                const currentPing = await pingTab(tabId)
                 const targetUrl = `https://www.facebook.com/search/posts?q=${encodeURIComponent(data.keyword)}`
                 await chrome.tabs.update(tabId, { url: targetUrl, active: true })
-                await waitForTabReady(tabId, 20000)
+                await waitForTabReady(tabId, 20000, currentPing.pageLoadId)
             } else {
                 await chrome.tabs.update(tabId, { active: true })
             }
@@ -365,11 +366,14 @@ async function processNextGroup(tabId: number): Promise<void> {
 
     console.log(`📍 [GROUP SEARCH] Processing group ${currentIndex + 1}/${currentState.groupQueue.length}: ${groupUrl}`)
 
+    // Get current page load ID to wait for new page
+    const currentPing = await pingTab(tabId)
+    
     // Navigate to group
     await chrome.tabs.update(tabId, { url: groupUrl })
 
     // Wait for page to load
-    await waitForTabReady(tabId, 20000)
+    await waitForTabReady(tabId, 20000, currentPing.pageLoadId)
 
     // Start scraping this group
     const response = await sendToContentScript(tabId, {
@@ -418,10 +422,13 @@ async function processNextMatrixSearch(tabId: number): Promise<void> {
         targetUrl = searchItem.groupUrl!
     }
 
+    // Get current page load ID to wait for new page
+    const currentPing = await pingTab(tabId)
+
     await chrome.tabs.update(tabId, { url: targetUrl })
 
     // Wait for page to load
-    await waitForTabReady(tabId, 20000)
+    await waitForTabReady(tabId, 20000, currentPing.pageLoadId)
 
     // Start scraping with the keyword
     const response = await sendToContentScript(tabId, {
