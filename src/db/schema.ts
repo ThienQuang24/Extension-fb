@@ -59,10 +59,24 @@ export interface Fanpage {
     syncedAt: Date
 }
 
+export interface Group {
+    id?: number
+    fbGroupId: string
+    name: string
+    url: string
+    enabled: boolean
+    privacy?: 'PUBLIC' | 'PRIVATE'
+    lastPostAt?: Date
+    syncedAt: Date
+}
+
 export interface Schedule {
     id?: number
     postId: number
-    fanpageId: number
+    targetType: 'FANPAGE' | 'GROUP' // NEW
+    fanpageId?: number // Optional if target is group
+    groupId?: number // Optional if target is fanpage
+    publisherId: 'PERSONAL' | string // 'PERSONAL' or fbPageId
     scheduledAt: Date
     status: 'pending' | 'processing' | 'success' | 'failed'
     error?: string
@@ -84,11 +98,28 @@ export class FacebookDatabase extends Dexie {
     filters!: Table<Filter, number>
     posts!: Table<Post, number>
     fanpages!: Table<Fanpage, number>
+    groups!: Table<Group, number> // NEW
     schedules!: Table<Schedule, number>
-    postUIDs!: Table<PostUID, number> // NEW
+    postUIDs!: Table<PostUID, number>
 
     constructor() {
         super('FacebookExtensionDB')
+
+        this.version(4).stores({
+            keywords: '++id, text, category, enabled',
+            filters: '++id, name, enabled',
+            posts: '++id, fbPostId, keywordUsed, published, crawledAt',
+            fanpages: '++id, fbPageId, name, enabled',
+            groups: '++id, fbGroupId, name, enabled', // NEW
+            schedules: '++id, postId, targetType, fanpageId, groupId, status',
+            postUIDs: '++id, fbPostId, crawledAt'
+        }).upgrade(tx => {
+            // Optional: Data migration if needed
+            return tx.table('schedules').toCollection().modify(s => {
+                if (!s.targetType) s.targetType = 'FANPAGE';
+                if (!s.publisherId) s.publisherId = s.fanpageId ? 'PAGE' : 'PERSONAL'; 
+            });
+        })
 
         this.version(3).stores({
             keywords: '++id, text, category, enabled',
@@ -97,15 +128,6 @@ export class FacebookDatabase extends Dexie {
             fanpages: '++id, fbPageId, name, enabled',
             schedules: '++id, postId, fanpageId, scheduledAt, status, publishedUrl',
             postUIDs: '++id, fbPostId, crawledAt'
-        }).upgrade(() => { })
-
-        this.version(2).stores({ // Increment version
-            keywords: '++id, text, category, enabled',
-            filters: '++id, name, enabled',
-            posts: '++id, fbPostId, keywordUsed, published, crawledAt',
-            fanpages: '++id, fbPageId, name, enabled',
-            schedules: '++id, postId, fanpageId, scheduledAt, status',
-            postUIDs: '++id, fbPostId, crawledAt' // NEW
         })
     }
 }

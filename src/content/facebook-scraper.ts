@@ -507,6 +507,89 @@ class FacebookScraper {
         })
     }
 
+    async syncJoinedGroups(): Promise<MessageResponse> {
+        if (this.isRunning) return { success: false, error: 'Scraper is busy' }
+        
+        const syncUrl = 'https://www.facebook.com/groups/joins'
+        if (!window.location.href.includes('/groups/joins')) {
+            console.log(`🌐 [SCRAPER] Navigating to groups sync URL: ${syncUrl}`)
+            window.location.href = syncUrl
+            return { success: true, data: { status: 'navigating' } }
+        }
+
+        try {
+            console.log('🚀 [SCRAPER] Syncing joined groups...')
+            
+            // Wait for initial groups to load
+            await this.wait(3000)
+            
+            const uniqueGroups = new Map<string, {name: string, url: string}>()
+            let lastGroupCount = 0
+            let sameCountRetries = 0
+            const MAX_SCROLLS = 30 // Increased limit to find more groups
+            
+            for (let i = 0; i < MAX_SCROLLS; i++) {
+                const groupLinks = Array.from(document.querySelectorAll('a[href*="/groups/"]'))
+                
+                groupLinks.forEach(link => {
+                    const anchor = link as HTMLAnchorElement
+                    const href = anchor.href
+                    
+                    // Group URL pattern: facebook.com/groups/{id}/
+                    const match = href.match(/\/groups\/(\d+)/)
+                    if (match) {
+                        const id = match[1]
+                        const name = anchor.innerText.trim()
+                        if (name && name.length > 2 && !uniqueGroups.has(id)) {
+                            uniqueGroups.set(id, { name, url: href.split('?')[0] })
+                        }
+                    }
+                })
+
+                console.log(`📊 [SCRAPER] Found ${uniqueGroups.size} groups so far...`)
+                
+                if (uniqueGroups.size === lastGroupCount) {
+                    sameCountRetries++
+                    if (sameCountRetries >= 3) {
+                        console.log('🏁 [SCRAPER] No more new groups found. Ending scroll.')
+                        break
+                    }
+                } else {
+                    sameCountRetries = 0
+                }
+                
+                lastGroupCount = uniqueGroups.size
+                
+                // Scroll to bottom
+                window.scrollTo(0, document.body.scrollHeight)
+                await this.wait(2000)
+            }
+
+            const groups = Array.from(uniqueGroups.entries()).map(([id, info]) => ({
+                fbGroupId: id,
+                name: info.name,
+                url: info.url,
+                enabled: true,
+                syncedAt: new Date()
+            }))
+
+            console.log(`✅ [SCRAPER] Found ${groups.length} groups.`)
+            
+            // Inform background script immediately
+            chrome.runtime.sendMessage({
+                type: 'GROUPS_SYNCED',
+                data: { groups }
+            })
+
+            return {
+                success: true,
+                data: { groups }
+            }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Sync failed' }
+        }
+    }
+
     getCurrentPosts(): Post[] {
         return this.collectedPosts
     }

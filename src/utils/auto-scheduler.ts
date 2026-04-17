@@ -18,15 +18,22 @@ export const DEFAULT_AUTO_SCHEDULER_CONFIG: AutoSchedulerConfig = {
     staggerDelay: 5 // Changed from 15 to 5 minutes
 }
 
+interface Target {
+    id?: number
+    name: string
+}
+
 interface ScheduleSlot {
     postId: number
-    fanpageId: number
+    fanpageId?: number
+    groupId?: number
+    targetId: number // Internal helper
     scheduledAt: Date
 }
 
 export function generateAutoSchedule(
     posts: Post[],
-    fanpages: Fanpage[],
+    targets: Target[],
     config: AutoSchedulerConfig = DEFAULT_AUTO_SCHEDULER_CONFIG
 ): ScheduleSlot[] {
     const slots: ScheduleSlot[] = []
@@ -34,7 +41,7 @@ export function generateAutoSchedule(
     // Only schedule unpublished posts
     const unpublishedPosts = posts.filter(p => !p.published)
 
-    if (unpublishedPosts.length === 0 || fanpages.length === 0) {
+    if (unpublishedPosts.length === 0 || targets.length === 0) {
         return slots
     }
 
@@ -44,21 +51,22 @@ export function generateAutoSchedule(
     // Track posts per fanpage per day for daily limit
     const dailyPostCount: Map<string, number> = new Map()
 
-    // For each post, schedule it to all selected fanpages
+    // For each post, schedule it to all selected targets
     for (const post of unpublishedPosts) {
-        for (let i = 0; i < fanpages.length; i++) {
-            const fanpage = fanpages[i]
+        for (let i = 0; i < targets.length; i++) {
+            const target = targets[i]
 
-            // Calculate time for this fanpage
+            // Calculate time for this target
             let scheduleTime = new Date(currentTime)
 
             if (config.multiPageStrategy === 'staggered' && i > 0) {
-                // Add stagger delay for subsequent fanpages
+                // Add stagger delay for subsequent targets
                 scheduleTime = addMinutes(scheduleTime, i * config.staggerDelay)
             }
 
-            // Check daily limit for this fanpage
-            const dayKey = `${fanpage.id}-${getDateKey(scheduleTime)}`
+            // Check daily limit for this target
+            const targetId = target.id || 0
+            const dayKey = `${targetId}-${getDateKey(scheduleTime)}`
             const count = dailyPostCount.get(dayKey) || 0
 
             if (count >= config.dailyLimit) {
@@ -72,12 +80,12 @@ export function generateAutoSchedule(
 
             slots.push({
                 postId: post.id!,
-                fanpageId: fanpage.id!,
+                targetId: targetId,
                 scheduledAt: scheduleTime
             })
 
             // Update daily count
-            const newDayKey = `${fanpage.id}-${getDateKey(scheduleTime)}`
+            const newDayKey = `${targetId}-${getDateKey(scheduleTime)}`
             dailyPostCount.set(newDayKey, (dailyPostCount.get(newDayKey) || 0) + 1)
         }
 

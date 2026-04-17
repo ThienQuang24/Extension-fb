@@ -19,6 +19,11 @@ const router = createRouter({
             component: () => import('@/popup/pages/FanpageManager.vue')
         },
         {
+            path: '/groups',
+            name: 'groups',
+            component: () => import('@/popup/pages/GroupManager.vue')
+        },
+        {
             path: '/keywords',
             name: 'keywords',
             component: () => import('@/popup/pages/KeywordManager.vue')

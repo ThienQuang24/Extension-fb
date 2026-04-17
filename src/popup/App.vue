@@ -14,6 +14,10 @@
         <span class="icon">📄</span>
         <span>Fanpage</span>
       </router-link>
+      <router-link to="/groups" class="nav-item">
+        <span class="icon">👥</span>
+        <span>Nhóm</span>
+      </router-link>
       <router-link to="/keywords" class="nav-item">
         <span class="icon">🏷️</span>
         <span>Từ khóa</span>

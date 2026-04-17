@@ -26,12 +26,17 @@ export const useSchedulesStore = defineStore('schedules', () => {
 
     async function createSchedule(
         postId: number,
-        fanpageId: number,
+        targetType: 'FANPAGE' | 'GROUP',
+        targetId: number, // Can be fanpage id or group id
+        publisherId: string, // 'PERSONAL' or fbPageId
         scheduledAt: Date
     ) {
         const schedule: Schedule = {
             postId,
-            fanpageId,
+            targetType,
+            fanpageId: targetType === 'FANPAGE' ? targetId : undefined,
+            groupId: targetType === 'GROUP' ? targetId : undefined,
+            publisherId,
             scheduledAt,
             status: 'pending',
             createdAt: new Date()
@@ -60,7 +65,10 @@ export const useSchedulesStore = defineStore('schedules', () => {
                 type: 'PUBLISH_POST',
                 data: {
                     postId: schedule.postId,
-                    fanpageId: schedule.fanpageId
+                    targetType: schedule.targetType,
+                    fanpageId: schedule.fanpageId,
+                    groupId: schedule.groupId,
+                    publisherId: schedule.publisherId
                 }
             })
 

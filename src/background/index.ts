@@ -6,7 +6,7 @@ console.log('Facebook Auto Manager: Background service worker loaded')
 
 // State management for persistence across navigations
 interface ActionState {
-    type: 'SEARCH' | 'SYNC' | 'IDLE'
+    type: 'SEARCH' | 'SYNC' | 'SYNC_GROUPS' | 'IDLE' // NEW: SYNC_GROUPS
     data?: any
     tabId?: number
     groupQueue?: string[] // For GROUP mode
@@ -42,6 +42,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             } else if (currentState.type === 'SYNC') {
                 await sendToContentScript(tabId, {
                     type: 'SYNC_FANPAGES'
+                })
+            } else if (currentState.type === 'SYNC_GROUPS') {
+                await sendToContentScript(tabId, {
+                    type: 'SYNC_GROUPS'
                 })
             }
         }, 3000)
@@ -91,6 +95,14 @@ onMessage((message, sender, sendResponse) => {
 
                 case 'FANPAGES_SYNCED':
                     response = await handleFanpagesSynced(message.data)
+                    break
+
+                case 'SYNC_GROUPS':
+                    response = await handleSyncGroups(sender.tab?.id)
+                    break
+
+                case 'GROUPS_SYNCED':
+                    response = await handleGroupsSynced(message.data)
                     break
 
                 case 'PUBLISH_POST':
@@ -637,27 +649,62 @@ async function handleFanpagesSynced(fanpages: any[]): Promise<MessageResponse> {
                 .first()
 
             if (existing) {
-                // Update
                 await db.fanpages.update(existing.id!, {
                     name: fanpage.name,
                     url: fanpage.url,
                     syncedAt: new Date()
                 })
             } else {
-                // Insert
                 await db.fanpages.add(fanpage)
             }
         }
-
-        return {
-            success: true,
-            data: { count: fanpages.length }
-        }
+        return { success: true, data: { count: fanpages.length } }
     } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to save fanpages'
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save fanpages' }
+    }
+}
+
+async function handleSyncGroups(senderTabId?: number): Promise<MessageResponse> {
+    const tabId = senderTabId || await getFacebookTab()
+    if (!tabId) return { success: false, error: 'Facebook tab not found' }
+
+    currentState = {
+        type: 'SYNC_GROUPS',
+        tabId: tabId
+    }
+
+    const response = await sendToContentScript(tabId, { type: 'SYNC_GROUPS' })
+    if (response.success && response.data && response.data.groups) {
+        await handleGroupsSynced(response.data)
+    }
+    return response
+}
+
+async function handleGroupsSynced(data: any): Promise<MessageResponse> {
+    try {
+        const { groups } = data
+        if (!groups || !Array.isArray(groups)) {
+            return { success: false, error: 'Invalid groups data' }
         }
+
+        currentState = { type: 'IDLE' }
+
+        for (const group of groups) {
+            const existing = await db.groups.where('fbGroupId').equals(group.fbGroupId).first()
+            if (existing) {
+                await db.groups.update(existing.id!, {
+                    name: group.name,
+                    url: group.url,
+                    syncedAt: new Date()
+                })
+            } else {
+                await db.groups.add(group)
+            }
+        }
+
+        return { success: true, data: { count: groups.length } }
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save groups' }
     }
 }
 
@@ -691,13 +738,25 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
     currentState = { type: 'IDLE' }
 
     try {
-        // Get post/fanpage data
+        // Get post/target data
         const post = await db.posts.get(data.postId)
-        const fanpage = await db.fanpages.get(data.fanpageId)
+        let target: any
+        let targetUrl = ''
+        let targetId = ''
 
-        if (!post || !fanpage) {
+        if (data.targetType === 'GROUP') {
+            target = await db.groups.get(data.groupId)
+            targetUrl = target?.url || ''
+            targetId = target?.fbGroupId || ''
+        } else {
+            target = await db.fanpages.get(data.fanpageId)
+            targetUrl = target?.url || ''
+            targetId = target?.fbPageId || ''
+        }
+
+        if (!post || !target) {
             publishingLocks.delete(data.postId)
-            return { success: false, error: 'Post or fanpage not found' }
+            return { success: false, error: 'Post or target not found' }
         }
 
         // Apply includeAuthor setting if enabled
@@ -717,8 +776,9 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
             type: 'PUBLISH_POST',
             data: {
                 post: clonedPost,
-                fanpageUrl: fanpage.url,
-                fbPageId: fanpage.fbPageId
+                fanpageUrl: targetUrl,
+                fbPageId: targetId,
+                publisherId: data.publisherId || 'PERSONAL'
             }
         })
 
@@ -761,9 +821,10 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                         const resendResult = await sendToContentScript(tabId, { 
                             type: 'PUBLISH_POST', 
                             data: { 
-                                post: post, 
-                                fanpageUrl: fanpage.url, 
-                                fbPageId: fanpage.fbPageId 
+                                post: clonedPost, 
+                                fanpageUrl: targetUrl, 
+                                fbPageId: targetId,
+                                publisherId: data.publisherId || 'PERSONAL'
                             } 
                         })
                         if (!resendResult.success) {
@@ -784,7 +845,7 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                     console.log('🎉 [PUBLISH] Success detected via polling!')
 
                     // Cleanup Function
-                    await handlePublishSuccess(post, fanpage, status.data?.publishedUrl)
+                    await handlePublishSuccess(post, target, data.targetType, status.data?.publishedUrl)
                     publishingLocks.delete(data.postId)
                     return { success: true, data: { publishedUrl: status.data?.publishedUrl } }
                 }
@@ -814,22 +875,33 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
     }
 }
 
-async function handlePublishSuccess(post: any, fanpage: any, publishedUrl?: string) {
+async function handlePublishSuccess(post: any, target: any, targetType: string, publishedUrl?: string) {
     await db.posts.update(post.id!, {
         published: true,
         publishedAt: new Date()
     })
 
-    await db.fanpages.update(fanpage.id!, {
-        lastPostAt: new Date(),
-        totalPosts: fanpage.totalPosts + 1
-    })
+    if (targetType === 'GROUP') {
+        await db.groups.update(target.id!, {
+            lastPostAt: new Date()
+        })
+    } else {
+        await db.fanpages.update(target.id!, {
+            lastPostAt: new Date(),
+            totalPosts: (target.totalPosts || 0) + 1
+        })
+    }
 
     if (publishedUrl) {
-        const schedule = await db.schedules
-            .where('postId').equals(post.id!)
-            .filter(s => s.fanpageId === fanpage.id! && s.status !== 'failed')
-            .last()
+        let query = db.schedules.where('postId').equals(post.id!).filter(s => s.status !== 'failed');
+        
+        if (targetType === 'GROUP') {
+            query = query.filter(s => s.groupId === target.id!);
+        } else {
+            query = query.filter(s => s.fanpageId === target.id!);
+        }
+
+        const schedule = await query.last()
 
         if (schedule) {
             await db.schedules.update(schedule.id!, {
@@ -878,7 +950,10 @@ async function checkScheduledPosts() {
         // Process ONLY the first due schedule
         const schedule = dueSchedules[0]
 
-        console.log(`Publishing post ${schedule.postId} to fanpage ${schedule.fanpageId} (${dueSchedules.length - 1} more in queue)`)
+        const targetName = schedule.targetType === 'GROUP' ? 'group' : 'fanpage'
+        const targetId = schedule.targetType === 'GROUP' ? schedule.groupId : schedule.fanpageId
+        
+        console.log(`Publishing post ${schedule.postId} to ${targetName} ${targetId} (${dueSchedules.length - 1} more in queue)`)
 
         // Set global lock
         isCurrentlyPublishing = true
@@ -889,7 +964,10 @@ async function checkScheduledPosts() {
         // Publish post - Let handlePublishPost manage tab creation/readiness
         const response = await handlePublishPost({
             postId: schedule.postId,
-            fanpageId: schedule.fanpageId
+            targetType: schedule.targetType,
+            fanpageId: schedule.fanpageId,
+            groupId: schedule.groupId,
+            publisherId: schedule.publisherId
         })
 
         // Update schedule status

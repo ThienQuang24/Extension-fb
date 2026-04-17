@@ -16,6 +16,8 @@ export type MessageType =
     | 'FETCH_IMAGE'
     | 'GET_PUBLISH_STATUS'
     | 'GET_SEARCH_STATUS'
+    | 'SYNC_GROUPS'
+    | 'GROUPS_SYNCED'
 
 export interface Message<T = any> {
     type: MessageType

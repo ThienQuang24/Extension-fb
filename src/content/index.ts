@@ -44,6 +44,10 @@ export function onExecute() {
                     case 'SYNC_FANPAGES':
                         response = await fanpageDetector.detectFanpages()
                         break
+                    
+                    case 'SYNC_GROUPS':
+                        response = await scraper.syncJoinedGroups()
+                        break
 
                     case 'PUBLISH_POST':
                         response = await postPublisher.startPublish(message.data)

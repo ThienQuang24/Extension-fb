@@ -7,6 +7,7 @@ interface PublishConfig {
     post: Post
     fanpageUrl: string
     fbPageId: string
+    publisherId?: 'PERSONAL' | string // NEW
 }
 
 // Status types for Polling
@@ -155,6 +156,20 @@ class PostPublisher {
         try {
             this.updateDebugOverlay('🔗 Đang lấy mã bảo mật FB (Token)...')
             const tokens = await this.getFBTokens()
+            
+            // Re-verify identity one last time before DOM/API
+            const finalActorId = tokens?.actorId || this.getCurrentProfileId()
+            const expectedId = config.publisherId === 'PERSONAL' ? '' : config.publisherId
+            
+            // If expectedId is established and doesn't match finalActorId (lenient check)
+            if (expectedId && finalActorId && finalActorId !== expectedId) {
+                console.warn(`🆔 [PUBLISH] Identity Mismatch at step 3! Expected: ${expectedId}, Actual: ${finalActorId}`)
+                this.updateDebugOverlay('⚠️ Nhầm định danh. Đang thử đồng bộ lại...')
+                await this.wait(3000)
+                // If it still doesn't match after a short wait, we might need a hard refresh or user intervention
+                // But for now, we try to proceed or the switch banner will catch it next loop.
+            }
+
             if (tokens) {
                 // Check if we should use Reels flow (if video exists)
                 if (config.post.videos && config.post.videos.length > 0) {
@@ -275,13 +290,20 @@ class PostPublisher {
 
                 const hasSwitchBanner = isBannerVisible(switchBtn as HTMLElement) || isBannerVisible(bannerSwitch)
                 
-                console.log(`🆔 [PUBLISH] Identity Scan (${retry + 1}/10): Target=${targetId}, CurrentActor=${currentId}, HasBanner=${hasSwitchBanner}`)
+                console.log(`🆔 [PUBLISH] Identity Scan (${retry + 1}/10): PublisherType=${config.publisherId}, Target=${targetId}, CurrentActor=${currentId}, HasBanner=${hasSwitchBanner}`)
 
-                // If Banner exists, we MUST switch
-                if (hasSwitchBanner) {
+                // NEW: If we are posting as PERSONAL and the composer is already there, ignore EVERYTHING ELSE.
+                if (config.publisherId === 'PERSONAL' && hasComposer) {
+                    console.log('✨ [PUBLISH] Posting as PERSONAL and composer is visible. Skipping identity checks.')
+                    localStorage.removeItem(this.PENDING_CONFIG_KEY)
+                    return false
+                }
+
+                // If Banner exists and we are NOT posting as Personal (or we specifically want to switch to a page)
+                if (hasSwitchBanner && config.publisherId !== 'PERSONAL') {
                     const btn = (switchBtn || bannerSwitch) as HTMLElement
                     
-                    console.log(`🎭 [PUBLISH] Switch Banner visible. Clicking...`)
+                    console.log(`🎭 [PUBLISH] Switch Banner visible and target is not PERSONAL. Clicking...`)
                     this.updateDebugOverlay(`🎭 Thấy nút Chuyển ngay. Đang nhấn chuyển...`)
                     
                     localStorage.setItem(this.PENDING_CONFIG_KEY, JSON.stringify(config))
@@ -319,6 +341,51 @@ class PostPublisher {
             }
         } catch (e) {
             console.warn('⚠️ [PUBLISH] Error during profile switch detection:', e)
+        }
+        return false
+    }
+
+    private async isCurrentlyActingAsPage(): Promise<boolean> {
+        try {
+            const scripts = Array.from(document.querySelectorAll('script'))
+            for (const script of scripts) {
+                const content = script.textContent || ''
+                // If it contains "pageID" and it's not null/undefined/empty string
+                if (content.includes('"pageID":"') && !content.includes('"pageID":""') && !content.includes('"pageID":null')) {
+                    return true
+                }
+            }
+        } catch {}
+        return false
+    }
+
+    private async switchToPersonalAccount(): Promise<boolean> {
+        try {
+            // First, look for the Account menu (Avatar top right)
+            const accountBtn = document.querySelector('div[aria-label="Tài khoản"], div[aria-label="Account"]') as HTMLElement
+            if (accountBtn) {
+                accountBtn.click()
+                await this.wait(2000)
+                
+                // Look for "See all profiles" or "Chuyển sang [Tên cá nhân]"
+                const switchSection = this.findVisibleElementByText(['Xem tất cả trang cá nhân', 'See all profiles'])
+                if (switchSection) {
+                    switchSection.click()
+                    await this.wait(2000)
+                }
+
+                // In the profile list, find the one that is NOT a Page
+                // Usually the first one or one with a specific text. 
+                // Alternatively, look for the "Switch back" button if exists.
+                const personalProfile = document.querySelector('div[role="radio"] div[dir="auto"], div[role="button"] div[dir="auto"]') as HTMLElement
+                if (personalProfile) {
+                    personalProfile.click()
+                    await this.wait(5000)
+                    return true
+                }
+            }
+        } catch (e) {
+            console.error('Error switching to personal account:', e)
         }
         return false
     }
@@ -380,31 +447,27 @@ class PostPublisher {
     private isTargetPage(targetUrl: string): boolean {
         const currentUrl = window.location.href
         
-        // 1. Exact URL match (with query params)
-        if (currentUrl.includes(targetUrl)) return true
+        // 1. Exact URL match (lenient towards parameters)
+        const cleanTarget = targetUrl.split('?')[0].replace(/\/$/, '')
+        const cleanCurrent = currentUrl.split('?')[0].replace(/\/$/, '')
+        
+        if (cleanCurrent.includes(cleanTarget)) return true
 
         // 2. ID-based match (Critical for profile.php?id=...)
         const targetId = this.extractIdFromUrl(targetUrl) || sessionStorage.getItem(this.TARGET_ID_KEY)
-        const currentProfileId = this.getCurrentProfileId()
         
         if (targetId) {
-            console.log(`🆔 [PUBLISH] ID Check: Target=${targetId}, CurrentActor=${currentProfileId}`)
-            if (currentProfileId === targetId) {
+            // If the URL actually contains the ID, consider it matched
+            if (currentUrl.includes(targetId)) {
+                return true
+            }
+            
+            // Identity check
+            const currentActorId = this.getCurrentProfileId()
+            if (currentActorId === targetId) {
                 sessionStorage.setItem(this.TARGET_ID_KEY, targetId)
                 return true
             }
-            // If we have a target ID but the current profile ID doesn't match, 
-            // and the URL doesn't contain the target ID, it's NOT the target page.
-            if (!currentUrl.includes(targetId)) return false
-        }
-
-        // 3. Lenient URL check (for username-based URLs or groups)
-        const cleanTarget = targetUrl.split('?')[0].replace(/\/$/, '')
-        const cleanCurrent = currentUrl.split('?')[0].replace(/\/$/, '')
-
-        if (cleanTarget.length > 20 && (cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent))) {
-            console.log('✅ [PUBLISH] URL matched (lenient check)')
-            return true
         }
 
         return false
@@ -731,8 +794,6 @@ class PostPublisher {
 
                 if (openBtn) break;
                 
-                if (openBtn) break;
-                
                 const msg = `⏳ Tìm nút "Bạn đang nghĩ gì?"... (${retry + 1}/10)`
                 console.log(msg);
                 this.updateDebugOverlay(msg)
@@ -742,56 +803,35 @@ class PostPublisher {
             if (!openBtn) throw new Error('Không tìm thấy nút tạo bài viết (Hệ thống đã chờ 50 giây)')
             this.updateDebugOverlay('🖱️ Đã tìm thấy nút. Đang mở khung soạn thảo...')
             openBtn.click()
-            await this.wait(4000)
+            await this.wait(6000)
 
-            // 2. Type Caption (if any)
-            if (config.post.content) {
-                this.updateDebugOverlay('⌨️ Đang nhập nội dung bài viết...')
-                let editor: HTMLElement | null = null;
+            // 2. Declare and Find Editor
+            let editor: HTMLElement | null = null;
+            const findEditor = () => {
                 const dialogs = document.querySelectorAll('[role="dialog"]');
-                
-                // Khảo sát mọi ô thoại từ lớp trên cùng xuống dưới cùng để tìm editor hợp lệ
                 for (let i = dialogs.length - 1; i >= 0; i--) {
                     const r = dialogs[i] as HTMLElement;
-                    editor = r.querySelector('div[contenteditable="true"][role="textbox"]') as HTMLElement
+                    const found = r.querySelector('div[contenteditable="true"][role="textbox"]') as HTMLElement
                           || r.querySelector('div[contenteditable="true"]') as HTMLElement
                           || r.querySelector('[data-lexical-editor="true"]') as HTMLElement
                           || r.querySelector('p.xdj266r') as HTMLElement;
-                    if (editor) break;
+                    if (found) return found;
                 }
+                return null;
+            };
 
+            // 3. Type Caption (Initial)
+            if (config.post.content) {
+                this.updateDebugOverlay('⌨️ Đang nhập nội dung bài viết...')
+                editor = findEditor();
                 if (editor) {
-                    editor.click();
-                    editor.focus();
-                    
-                    // Cách 1: Sử dụng PasteEvent (Tương thích tốt với Lexical)
-                    const dataTransfer = new DataTransfer()
-                    dataTransfer.setData('text/plain', config.post.content)
-                    const pasteEvent = new ClipboardEvent('paste', {
-                        clipboardData: dataTransfer,
-                        bubbles: true,
-                        cancelable: true
-                    })
-                    editor.dispatchEvent(pasteEvent)
-                    await this.wait(500)
-                    
-                    // Cách 2: Fallback to execCommand + InputEvent (Kích hoạt bộ đánh giá React)
-                    if (!editor.innerText || !editor.innerText.trim()) {
-                         document.execCommand('insertText', false, config.post.content);
-                         editor.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
+                    await this.setEditorText(editor, config.post.content)
                     await this.wait(2000)
-                } else {
-                    console.warn("⚠️ [Feed DOM] Không tìm thấy khung soạn thảo nội dung trong cửa sổ popup.");
                 }
             }
 
-            // 3. Upload Images
+            // 4. Upload Images
             if (config.post.images && config.post.images.length > 0) {
-                const checkDialogs = document.querySelectorAll('[role="dialog"]');
-                if (checkDialogs.length === 0) {
-                    throw new Error('Cửa sổ tạo bài viết chưa bật lên được, không thể tải ảnh!');
-                }
                 const addPhotoBtn = this.findVisibleElementByText(['Ảnh/video', 'Photo/Video', 'Photo/video', 'Ảnh', 'Photo'])
                 if (addPhotoBtn) {
                     addPhotoBtn.click()
@@ -799,73 +839,80 @@ class PostPublisher {
                 }
                 const uploadSuccess = await this.injectImageFiles(config.post.images)
                 if (!uploadSuccess) throw new Error('Không thể tải ảnh lên')
-                console.log('⏳ [Feed DOM] Đang đợi xử lý ảnh...')
-                await this.wait(6000)
+                
+                this.updateDebugOverlay('⏳ Đang đợi Facebook xử lý ảnh...')
+                let imagesReady = false
+                const targetCount = config.post.images.length
+                for (let i = 0; i < 15; i++) {
+                    await this.wait(2000)
+                    const removeBtns = document.querySelectorAll('div[aria-label="Gỡ"], div[aria-label="Remove"], div[aria-label*="Gỡ ảnh"], div[aria-label*="Remove photo"]')
+                    if (removeBtns.length >= targetCount) {
+                        imagesReady = true
+                        break
+                    }
+                    this.updateDebugOverlay(`⏳ Đang tải ảnh... (${removeBtns.length}/${targetCount})`)
+                }
+                if (imagesReady) {
+                    this.updateDebugOverlay('✅ Ảnh đã sẵn sàng!')
+                    await this.wait(2000)
+                }
             }
 
-            // 4. Kiểm tra nút "Tiếp" (trường hợp đăng trên Page cần 2 bước)
+            // 5. Check "Next" button (Page mode)
             let nextBtn: HTMLElement | null = null;
             const nextBtnSelectors = ['div[aria-label="Tiếp"]', 'div[aria-label="Next"]'];
             for (const sel of nextBtnSelectors) {
                 const el = document.querySelector(sel) as HTMLElement;
                 if (el) { nextBtn = el; break; }
             }
-            if (!nextBtn) {
-                 const buttons = document.querySelectorAll('div[role="button"]');
-                 for (const btn of Array.from(buttons) as HTMLElement[]) {
-                     const t = (btn.innerText || btn.textContent)?.toLowerCase().trim() || '';
-                     if (t === 'tiếp' || t === 'next') {
-                         nextBtn = btn;
-                         break;
-                     }
-                 }
-            }
             if (nextBtn) {
-                console.log('⏳ [Feed DOM] Tìm thấy nút Tiếp, đang click...');
                 nextBtn.click();
-                await this.wait(4000); // Chờ modal thứ 2 hiện ra
+                await this.wait(4000);
             }
 
-            // 5. Click "Đăng"
+            // 6. RE-VERIFY CAPTION (Lexical Sync)
+            if (config.post.content) {
+                editor = findEditor();
+                const currentText = editor?.innerText?.trim() || '';
+                if (editor && currentText.length < 2) {
+                    console.log('🔄 [Feed DOM] Caption was lost. Re-writing...')
+                    this.updateDebugOverlay('⌨️ Đang kiểm tra lại nội dung...')
+                    await this.setEditorText(editor, config.post.content)
+                    await this.wait(2000)
+                }
+            }
+
+            // 7. Click "Post"
             let publishBtn: HTMLElement | null = null;
-            
-            // 4.1 Thử tìm qua aria-label trước vì chính xác nhất
-            const btnSelectors = [
-                'div[aria-label="Đăng"]', 'div[aria-label="Publish"]', 'div[aria-label="Post"]',
-                'div[aria-label="Chia sẻ"]', 'div[aria-label="Share"]'
-            ];
+            const btnSelectors = ['div[aria-label="Đăng"]', 'div[aria-label="Publish"]', 'div[aria-label="Post"]', 'div[aria-label="Chia sẻ"]', 'div[aria-label="Share"]'];
             for (const sel of btnSelectors) {
                 const el = document.querySelector(sel) as HTMLElement;
                 if (el) { publishBtn = el; break; }
             }
 
-            // 4.2 Nếu không tìm thấy, tìm qua text hiển thị
             if (!publishBtn) {
                 publishBtn = this.findVisibleElementByText(['Đăng', 'Publish', 'Chia sẻ', 'Share', 'Post']);
-                // Loại trừ các trường hợp tìm nhầm (chứa từ khóa gây nhiễu)
-                if (publishBtn && publishBtn.innerText) {
-                    const txt = publishBtn.innerText.toLowerCase();
-                    if (txt.includes('đăng ký') || txt.includes('đăng xuất') || txt.includes('đăng nhập')) {
-                        publishBtn = null;
-                    }
-                }
             }
 
-            // 4.3 Fallback cuối cùng vét cạn các phần tử có role="button"
-            if (!publishBtn) {
-                const buttons = document.querySelectorAll('div[role="button"]');
-                for (const btn of Array.from(buttons) as HTMLElement[]) {
-                    const t = (btn.innerText || btn.textContent)?.toLowerCase().trim() || '';
-                    if (['đăng', 'post', 'publish', 'chia sẻ', 'chia sẻ ngay', 'share'].includes(t)) {
-                        publishBtn = btn;
-                        break;
-                    }
-                }
-            }
-
-            if (!publishBtn) throw new Error('Không tìm thấy nút Đăng bài (Đã thử mọi selector)')
+            if (!publishBtn) throw new Error('Không tìm thấy nút Đăng bài')
             
-            this.updateDebugOverlay('🚀 Nhấn nút "Đăng". Chờ FB xử lý...')
+            this.updateDebugOverlay('🚀 Kiểm tra nút "Đăng"...')
+            let isBtnEnabled = false
+            for (let i = 0; i < 10; i++) {
+                const isDisabled = publishBtn.getAttribute('aria-disabled') === 'true' || (publishBtn as any).disabled === true
+                if (!isDisabled) {
+                    isBtnEnabled = true
+                    break
+                }
+                this.updateDebugOverlay(`⏳ Chờ nút Đăng sẵn sàng... (${i+1}/10)`)
+                await this.wait(1500)
+            }
+
+            if (!isBtnEnabled) {
+                console.warn('⚠️ [Feed DOM] Nút Đăng có vẻ bị khóa, vẫn thử nhấn...')
+            }
+
+            this.updateDebugOverlay('🚀 Nhấn nút "Đăng". Chờ FB xác nhận...')
             publishBtn.click()
             
             console.log('⏳ [Feed DOM] Đang xuất bản...')
@@ -1065,6 +1112,66 @@ class PostPublisher {
             }
         } catch (e) { console.warn('findVisibleElementByText error:', e) }
         return null;
+    }
+
+    private async setEditorText(editor: HTMLElement, text: string): Promise<void> {
+        const isActuallyEmpty = () => {
+            const raw = (editor.innerText || editor.textContent || '').trim();
+            if (raw.length >= 2) return false;
+            // Lexical check
+            return editor.querySelectorAll('span, p, br, div[data-text]').length === 0;
+        };
+
+        try {
+            console.log('📝 [Editor] Starting text input sequence...')
+            editor.click()
+            editor.focus()
+            await this.wait(500)
+            
+            // Method 1: execCommand (Replacing selection)
+            document.execCommand('selectAll', false)
+            document.execCommand('insertText', false, text)
+            editor.dispatchEvent(new Event('input', { bubbles: true }))
+            
+            await this.wait(800) // Wait for Lexical to sync
+            if (!isActuallyEmpty()) {
+                console.log('✅ [Editor] Method 1 (execCommand) Succeeded.')
+                return
+            }
+            
+            // Method 2: Clipboard Paste
+            console.log('🔄 [Editor] Method 1 failed or delay too long. Trying Method 2 (Paste)...')
+            const dataTransfer = new DataTransfer()
+            dataTransfer.setData('text/plain', text)
+            const pasteEvent = new ClipboardEvent('paste', {
+                clipboardData: dataTransfer,
+                bubbles: true,
+                cancelable: true
+            })
+            editor.dispatchEvent(pasteEvent)
+            
+            await this.wait(800)
+            if (!isActuallyEmpty()) {
+                console.log('✅ [Editor] Method 2 (Paste) Succeeded.')
+                return
+            }
+            
+            // Method 3: Direct Property Assignment (Last Resort)
+            console.log('⚠️ [Editor] Methods 1 & 2 failed. Using method 3 (Direct)...')
+            // Clear manually to prevent duplication if somehow it was hidden
+            editor.innerHTML = '' 
+            const p = document.createElement('p')
+            p.className = 'xdj266r' // FB common paragraph class
+            p.innerHTML = `<span data-text="true">${text}</span>`
+            editor.appendChild(p)
+            
+            editor.dispatchEvent(new Event('input', { bubbles: true }))
+            editor.dispatchEvent(new Event('change', { bubbles: true }))
+            
+            console.log('📝 [Editor] Text set attempt finished.')
+        } catch (e) {
+            console.error('Error setting editor text:', e)
+        }
     }
 
     private wait(ms: number): Promise<void> {
