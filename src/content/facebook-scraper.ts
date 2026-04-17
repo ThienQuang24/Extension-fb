@@ -15,6 +15,7 @@ interface SearchConfig {
 class FacebookScraper {
     private isRunning = false
     private collectedPosts: Post[] = []
+    private scannedPostIds: Set<string> = new Set() // NEW: Track every post seen to check relevance
     private scrollInterval: number | null = null
     private watchdogTimer: number | null = null
     private lastActivityTime: number = Date.now()
@@ -27,6 +28,7 @@ class FacebookScraper {
 
         this.isRunning = true
         this.collectedPosts = []
+        this.scannedPostIds = new Set() // Reset scanned counter
         this.config = config
 
         try {
@@ -140,8 +142,17 @@ class FacebookScraper {
                 previousHeight = document.body.scrollHeight
 
                 const bodyText = document.body.innerText || ''
-                if (FACEBOOK_SELECTORS.END_MARKERS.some(marker => bodyText.includes(marker))) {
-                    console.log(`🏁 [SCRAPER] Found end marker. Ending.`)
+                if (FACEBOOK_SELECTORS.END_MARKERS.some(marker => bodyText.includes(marker)) || 
+                    bodyText.includes('Kết quả từ bên ngoài nhóm') || 
+                    bodyText.includes('Results from outside the group')) {
+                    console.log(`🏁 [SCRAPER] Found end marker or non-group results. Ending.`)
+                    break
+                }
+
+                // NEW: Relevance threshold check
+                // If we scanned more than 20 posts and found 0 matches, skip this group
+                if (this.scannedPostIds.size >= 20 && this.collectedPosts.length === 0) {
+                    console.log(`🏁 [SCRAPER] Relevance threshold reached (Scanned ${this.scannedPostIds.size} posts with 0 matches). Skipping group.`)
                     break
                 }
 
@@ -270,6 +281,13 @@ class FacebookScraper {
 
                 const postId = this.extractPostId(card)
                 if (!postId) return
+                
+                // Track every unique post we encounter for relevance checking
+                if (!this.scannedPostIds.has(postId)) {
+                    this.scannedPostIds.add(postId)
+                    // console.log(`👁️ [SCRAPER] Scanned post #${this.scannedPostIds.size}: ${postId}`)
+                }
+
                 if (this.collectedPosts.some(p => p.fbPostId === postId)) return
 
                 const post = this.extractPostData(card, keyword)

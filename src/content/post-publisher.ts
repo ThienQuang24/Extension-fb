@@ -19,8 +19,10 @@ export interface PublishStatus {
 
 class PostPublisher {
     private isPublishing = false
-    private static isGlobalLocked = false // Strict guard against parallel execution
+    private isRedirecting = false 
+    private static isGlobalLocked = false 
     private publishTimeout: number | null = null
+    private debugOverlay: HTMLElement | null = null
     public readonly pageLoadId = Math.random().toString(36).substring(2, 15)
 
     // Polling State
@@ -30,16 +32,37 @@ class PostPublisher {
     private readonly STATE_KEY = 'fb_publish_state'
     private readonly STEP_KEY = 'fb_publish_step'
     private readonly TARGET_ID_KEY = 'fb_publish_target_id'
+    private readonly PENDING_CONFIG_KEY = 'fb_publish_pending_config'
 
-    constructor() {
-        this.checkResume()
-    }
+    constructor() { }
 
     // Resume logic for page reloads (Legacy/Backup)
-    private checkResume() {
-        const step = sessionStorage.getItem(this.STEP_KEY)
-        if (step) {
-            console.log(`🔄 [RESUME] Found existing step: ${step}`)
+    public init() {
+        const pendingConfig = localStorage.getItem(this.PENDING_CONFIG_KEY)
+        if (pendingConfig) {
+            console.log('🔄 [RESUME] Found pending publish configuration in LocalStorage. Restarting...')
+            
+            // Show overlay IMMEDIATELY
+            this.showDebugOverlay('📡 Đang đồng bộ tác vụ với hệ thống trung tâm...')
+            
+            try {
+                const config = JSON.parse(pendingConfig) as PublishConfig
+                
+                // DO NOT remove immediately. 
+                // Facebook reloads multiple times during profile switch.
+                // We only remove it once processPublish successfully confirms the target identity.
+                
+                setTimeout(() => {
+                    this.updateDebugOverlay('🚀 Đang kích hoạt lại tiến trình...')
+                    this.startPublish(config).catch(err => {
+                        console.error('❌ [RESUME] Failed to auto-restart publish:', err)
+                        // If it fails with "Already publishing", that's fine (means another instance started)
+                    })
+                }, 4000)
+            } catch (e) {
+                console.error('❌ [RESUME] Error parsing pending config:', e)
+                localStorage.removeItem(this.PENDING_CONFIG_KEY)
+            }
         }
     }
 
@@ -49,58 +72,103 @@ class PostPublisher {
     }
 
     // New Non-blocking Start Method
-    public async startPublish(config: PublishConfig): Promise<{ success: boolean, message: string }> {
+    public async startPublish(config: PublishConfig): Promise<{ success: boolean, error?: string, message?: string }> {
         if (this.isPublishing || PostPublisher.isGlobalLocked) {
-            return { success: false, message: 'Already publishing' }
+            return { success: false, error: 'Tiến trình đang chạy. Vui lòng chờ.' }
         }
 
+        this.showDebugOverlay('🚀 Bắt đầu tiến trình...')
+        
         this.isPublishing = true
+        this.isRedirecting = false
         PostPublisher.isGlobalLocked = true
         this.currentStatus = { status: 'processing', timestamp: Date.now() }
 
         // Start async process WITHOUT awaiting it here (Fire and Forget)
         this.processPublish(config).catch(err => {
             console.error('Unhandled publish error:', err)
+            this.updateDebugOverlay(`💥 Lỗi nghiêm trọng: ${err.message || 'Unknown'}`)
             this.currentStatus = {
                 status: 'failed',
-                error: err.message,
+                error: err.message || 'Unknown Error',
                 timestamp: Date.now()
             }
             this.isPublishing = false
             PostPublisher.isGlobalLocked = false
         })
 
-        return { success: true, message: 'Started' }
+        return { success: true, message: 'Đã bắt đầu tiến trình đăng bài' }
     }
 
     // Internal processing logic (Moved from publishPost)
     private async processPublish(config: PublishConfig): Promise<void> {
-        // Auto-reset after 60 seconds (Increased for safety)
+        this.showDebugOverlay('🔍 Đang kiểm tra vị trí...')
+        
+        // --- 1. NAVIGATION CHECK (CRITICAL) ---
+        // Ensure we are on the target Fanpage/Group before doing anything
+        if (!this.isTargetPage(config.fanpageUrl)) {
+            const msg = `🗺️ Chuyển hướng đến Fanpage: ${config.fanpageUrl}`
+            console.log(msg)
+            this.updateDebugOverlay(msg)
+            
+            const targetId = this.extractIdFromUrl(config.fanpageUrl)
+            if (targetId) localStorage.setItem(this.TARGET_ID_KEY, targetId)
+            
+            // Save config to local storage for resume after reload
+            localStorage.setItem(this.PENDING_CONFIG_KEY, JSON.stringify(config))
+            
+            // Redirect
+            this.isRedirecting = true
+            window.location.href = config.fanpageUrl
+            return 
+        }
+
+        // --- 2. PROFILE SWITCH CHECK ---
+        const currentActor = this.getCurrentProfileId()
+        this.updateDebugOverlay(`🎭 Kiểm tra quyền Quản trị (Tư cách: ${currentActor || '?'})...`)
+        
+        // Sometimes we are on the right URL but in the wrong profile context
+        if (await this.checkAndSwitchProfile(config)) {
+            const msg = '⏳ Phát hiện cần đổi Profile. Đang nhấn chuyển...'
+            console.log(msg)
+            this.updateDebugOverlay(msg)
+            return // Exit and let checkResume handle the reload
+        }
+
+        // --- SUCCESS: TARGET IDENTITY CONFIRMED ---
+        // Now it is safe to remove the pending configuration
+        localStorage.removeItem(this.PENDING_CONFIG_KEY)
+        this.updateDebugOverlay(`✅ Tư cách: ${currentActor} (Sẵn sàng)`)
+
+        // Auto-reset after 180 seconds
         this.publishTimeout = window.setTimeout(() => {
             console.warn('Publishing timeout - auto resetting flag')
             if (this.currentStatus.status === 'processing') {
-                this.currentStatus = { status: 'failed', error: 'Timeout', timestamp: Date.now() }
+                this.updateDebugOverlay('❌ Hết thời gian chờ (180s)')
+                this.currentStatus = { status: 'failed', error: 'Timeout (180s)', timestamp: Date.now() }
             }
             this.isPublishing = false
             this.publishTimeout = null
             PostPublisher.isGlobalLocked = false
-        }, 60000)
+        }, 180000)
 
         try {
-            // --- 100% SILENT API STRATEGY ---
+            this.updateDebugOverlay('🔗 Đang lấy mã bảo mật FB (Token)...')
             const tokens = await this.getFBTokens()
             if (tokens) {
                 // Check if we should use Reels flow (if video exists)
                 if (config.post.videos && config.post.videos.length > 0) {
-                    console.log('📹 [PUBLISH] Video detected. Using Reels DOM flow.')
+                    this.updateDebugOverlay('📹 Đang xử lý đăng Video/Reels...')
                     const reelsResult = await this.publishReels(config)
                     if (reelsResult.success) {
+                        this.updateDebugOverlay('🎉 Đăng bài thành công!')
                         this.currentStatus = {
                             status: 'success',
                             data: { publishedUrl: reelsResult.publishedUrl },
                             timestamp: Date.now()
                         }
                     } else {
+                        this.updateDebugOverlay(`❌ Thất bại: ${reelsResult.error}`)
                         this.currentStatus = {
                             status: 'failed',
                             error: `Reels Error: ${reelsResult.error}`,
@@ -108,18 +176,17 @@ class PostPublisher {
                         }
                     }
                 } else {
-                    // Use DOM instead of buggy GraphQL
-                    console.log('🖼️ [PUBLISH] Text/Image detected. Using Feed DOM flow.')
+                    this.updateDebugOverlay('🖼️ Đang soạn thảo bài đăng...')
                     const feedResult = await this.publishFeedDOM(config)
                     if (feedResult.success) {
-                        console.log('✨ [PUBLISH] DOM Published successfully.')
+                        this.updateDebugOverlay('🎉 Đăng bài thành công!')
                         this.currentStatus = {
                             status: 'success',
                             data: { publishedUrl: feedResult.publishedUrl },
                             timestamp: Date.now()
                         }
                     } else {
-                        console.error(`❌ [PUBLISH] DOM Posting failed: ${feedResult.error}`)
+                        this.updateDebugOverlay(`❌ Thất bại: ${feedResult.error}`)
                         this.currentStatus = {
                             status: 'failed',
                             error: `Lỗi đăng bài DOM: ${feedResult.error}`,
@@ -128,23 +195,18 @@ class PostPublisher {
                     }
                 }
             } else {
-                // --- TOKEN EXTRACTION FAILED ---
-
-                // Let's keep the nav logic for safety
-                const targetId = this.extractIdFromUrl(config.fanpageUrl)
-                if (targetId) sessionStorage.setItem(this.TARGET_ID_KEY, targetId)
-
-                if (!this.isTargetPage(config.fanpageUrl)) {
-                    console.log(`🗺️ Navigating to: ${config.fanpageUrl}`)
-                    window.location.href = config.fanpageUrl
-                    // Status stays 'processing' until reload... 
-                    return
-                }
-
-                this.currentStatus = {
-                    status: 'failed',
-                    error: 'Không tìm thấy Token bảo mật. Vui lòng F5 trang.',
-                    timestamp: Date.now()
+                this.updateDebugOverlay('⚠️ Không lấy được Token (fb_dtsg). Thử cách đăng DOM dự phòng...')
+                const feedResult = await this.publishFeedDOM(config)
+                if (feedResult.success) {
+                    this.updateDebugOverlay('🎉 Đăng bài thành công (DOM)')
+                    this.currentStatus = { status: 'success', timestamp: Date.now() }
+                } else {
+                    this.updateDebugOverlay(`❌ Thất bại: ${feedResult.error}`)
+                    this.currentStatus = {
+                        status: 'failed',
+                        error: 'Không tìm thấy Token và lỗi đăng bài DOM.',
+                        timestamp: Date.now()
+                    }
                 }
             }
         } catch (error) {
@@ -154,13 +216,119 @@ class PostPublisher {
                 timestamp: Date.now()
             }
         } finally {
-            this.isPublishing = false
-            PostPublisher.isGlobalLocked = false
-            if (this.publishTimeout) {
-                clearTimeout(this.publishTimeout)
+            // CRITICAL: Only reset flags if we are NOT in the middle of a redirect
+            // If we are redirecting, the next page load should handle the cleanup
+            if (!this.isRedirecting) {
+                console.log('🧹 [PUBLISH] Final cleanup: Resetting flags.')
+                this.isPublishing = false
+                PostPublisher.isGlobalLocked = false
+                if (this.publishTimeout) {
+                    clearTimeout(this.publishTimeout)
+                    this.publishTimeout = null
+                }
+            } else {
+                console.log('🔄 [PUBLISH] Navigating... Flags preserved for next page load.')
             }
             sessionStorage.removeItem(this.STEP_KEY)
+            
+            // Auto hide overlay after success/fail
+            setTimeout(() => this.removeDebugOverlay(), 5000)
         }
+    }
+
+    private async checkAndSwitchProfile(config: PublishConfig): Promise<boolean> {
+        try {
+            const targetId = this.extractIdFromUrl(config.fanpageUrl) || config.fbPageId
+            const currentUrl = window.location.href
+
+            // Loop to wait for the page identity/switch button to load
+            for (let retry = 0; retry < 10; retry++) {
+                const currentId = this.getCurrentProfileId()
+                
+                // Show current status for better user debugging
+                this.updateDebugOverlay(`⏳ Chờ xác thực tư cách...\n🔎 ID hiện tại: ${currentId || 'Không tìm thấy'}\n🎯 ID mục tiêu: ${targetId}`)
+
+                // SHORTCUT: If we are on the target URL and the "Bạn đang nghĩ gì?" composer is visible,
+                // we treat this as a success even if ID detection is being slow.
+                const hasComposer = !!Array.from(document.querySelectorAll('div[role="button"]')).find(el => {
+                    const txt = (el as HTMLElement).innerText || '';
+                    return txt.toLowerCase().includes('nghĩ gì') || txt.toLowerCase().includes('mind');
+                }) || !!document.querySelector('div[aria-label*="nghĩ gì"], div[aria-label*="mind"]');
+
+                if (hasComposer && currentUrl.includes(targetId || '')) {
+                     console.log('✨ [PUBLISH] Composer visible on target URL. Proceeding bypass.')
+                     localStorage.removeItem(this.PENDING_CONFIG_KEY)
+                     return false
+                }
+
+                // CRITICAL PRIORITY: Check for the "Switch Profile" banner first
+                // If this exists, we ARE NOT in the right profile, regardless of what ID we detected
+                const switchBtn = this.findVisibleElementByText(FACEBOOK_SELECTORS.SWITCH_PROFILE_BUTTON)
+                const bannerSwitch = document.querySelector('div[aria-label="Chuyển ngay"], div[aria-label="Switch Now"]') as HTMLElement
+                
+                // Better visibility check
+                const isBannerVisible = (el: HTMLElement | null) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    return rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).display !== 'none';
+                }
+
+                const hasSwitchBanner = isBannerVisible(switchBtn as HTMLElement) || isBannerVisible(bannerSwitch)
+                
+                console.log(`🆔 [PUBLISH] Identity Scan (${retry + 1}/10): Target=${targetId}, CurrentActor=${currentId}, HasBanner=${hasSwitchBanner}`)
+
+                // If Banner exists, we MUST switch
+                if (hasSwitchBanner) {
+                    const btn = (switchBtn || bannerSwitch) as HTMLElement
+                    
+                    console.log(`🎭 [PUBLISH] Switch Banner visible. Clicking...`)
+                    this.updateDebugOverlay(`🎭 Thấy nút Chuyển ngay. Đang nhấn chuyển...`)
+                    
+                    localStorage.setItem(this.PENDING_CONFIG_KEY, JSON.stringify(config))
+                    this.currentStatus = { status: 'processing', timestamp: Date.now() }
+                    
+                    this.isRedirecting = true
+                    
+                    // Robust Click
+                    btn.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    await this.wait(1000)
+                    
+                    const events = ['mousedown', 'mouseup', 'click']
+                    for (const evName of events) {
+                        btn.dispatchEvent(new MouseEvent(evName, {
+                            bubbles: true,
+                            cancelable: true,
+                            view: window
+                        }))
+                    }
+                    
+                    await this.wait(8000) // Wait longer for the reload to trigger
+                    return true
+                }
+
+                // If no banner, check if our CurrentActor matches target
+                if (targetId && currentId && targetId === currentId) {
+                    console.log('✅ [PUBLISH] Actor ID matches! Proceeding.')
+                    // Always clear the pending flag once ID is confirmed
+                    localStorage.removeItem(this.PENDING_CONFIG_KEY)
+                    return false
+                }
+
+                this.updateDebugOverlay(`⏳ Chờ định danh... (${retry + 1}/10)`)
+                await this.wait(5000)
+            }
+        } catch (e) {
+            console.warn('⚠️ [PUBLISH] Error during profile switch detection:', e)
+        }
+        return false
+    }
+
+    private extractIdFromBanner(banner: HTMLElement | null): string | null {
+        if (!banner) return null
+        // Sometimes the ID is in the data attributes or surrounding text
+        const text = banner.innerText || banner.parentElement?.innerText || ''
+        const match = text.match(/id=(\d+)/) || text.match(/profile\/(\d+)/)
+        return match ? match[1] : null
     }
 
     // Kept for API mode internal use
@@ -176,16 +344,33 @@ class PostPublisher {
 
     private getCurrentProfileId(): string | null {
         try {
-            const scripts = document.querySelectorAll('script')
-            for (const script of Array.from(scripts)) {
+            // Source 1: JavaScript source objects (STRICTLY ActorID/UserID)
+            const scripts = Array.from(document.querySelectorAll('script'))
+            for (const script of scripts) {
                 const content = script.textContent || ''
-                const m = content.match(/"actorID":"(\d+)"/) || content.match(/"pageID":"(\d+)"/)
-                if (m) {
-                    return m[1]
-                }
+                // Priority patterns for identity
+                const m = content.match(/"actorID":"(\d+)"/) || 
+                          content.match(/"userID":"(\d+)"/) ||
+                          content.match(/"AccountID":"(\d+)"/) ||
+                          content.match(/"identifier":"(\d+)"/) ||
+                          content.match(/,"id":"(\d+)"/)
+                          
+                if (m) return m[1]
             }
-            const metaId = document.querySelector('meta[property="al:android:url"]')?.getAttribute('content')?.match(/page\/(\d+)/)?.[1]
-            if (metaId) return metaId
+
+            // Source 2: DTSG Initial Data (Very reliable actor source)
+            for (const script of scripts) {
+                const content = script.textContent || ''
+                const dtsgMatch = content.match(/"USER_ID":"(\d+)"/) || 
+                                 content.match(/"actor_id":"(\d+)"/) ||
+                                 content.match(/"user_id":"(\d+)"/)
+                if (dtsgMatch) return dtsgMatch[1]
+            }
+
+            // Source 3: Cookies (Ultimate Fallback)
+            const cUser = document.cookie.split('; ').find(row => row.trim().startsWith('c_user='))?.split('=')[1]
+            if (cUser) return cUser
+
         } catch (e) {
             console.warn('Error detecting current profile ID:', e)
         }
@@ -194,15 +379,34 @@ class PostPublisher {
 
     private isTargetPage(targetUrl: string): boolean {
         const currentUrl = window.location.href
+        
+        // 1. Exact URL match (with query params)
         if (currentUrl.includes(targetUrl)) return true
 
+        // 2. ID-based match (Critical for profile.php?id=...)
         const targetId = this.extractIdFromUrl(targetUrl) || sessionStorage.getItem(this.TARGET_ID_KEY)
         const currentProfileId = this.getCurrentProfileId()
+        
+        if (targetId) {
+            console.log(`🆔 [PUBLISH] ID Check: Target=${targetId}, CurrentActor=${currentProfileId}`)
+            if (currentProfileId === targetId) {
+                sessionStorage.setItem(this.TARGET_ID_KEY, targetId)
+                return true
+            }
+            // If we have a target ID but the current profile ID doesn't match, 
+            // and the URL doesn't contain the target ID, it's NOT the target page.
+            if (!currentUrl.includes(targetId)) return false
+        }
 
-        if (targetId && currentProfileId && targetId === currentProfileId) {
-            if (targetId) sessionStorage.setItem(this.TARGET_ID_KEY, targetId)
+        // 3. Lenient URL check (for username-based URLs or groups)
+        const cleanTarget = targetUrl.split('?')[0].replace(/\/$/, '')
+        const cleanCurrent = currentUrl.split('?')[0].replace(/\/$/, '')
+
+        if (cleanTarget.length > 20 && (cleanCurrent.includes(cleanTarget) || cleanTarget.includes(cleanCurrent))) {
+            console.log('✅ [PUBLISH] URL matched (lenient check)')
             return true
         }
+
         return false
     }
 
@@ -500,36 +704,49 @@ class PostPublisher {
             let openBtn: HTMLElement | null = null;
             const openTriggers = ['bạn đang nghĩ gì', "what's on your mind", "tạo bài viết", "create post"];
             
-            // Ưu tiên tìm các thẻ đích thực sự có thể click được (chứa role="button" hoặc thẻ a)
-            const clickableCands = document.querySelectorAll('div[role="button"], a[role="link"], div.x1i10hfl');
-            for (const el of Array.from(clickableCands) as HTMLElement[]) {
-                if (el.offsetParent === null) continue;
-                const txt = el.innerText?.toLowerCase().trim() || '';
-                if (openTriggers.some(t => txt.includes(t))) {
-                    openBtn = el;
-                    break;
+            // Loop 10 times x 5 seconds = 50 seconds total wait for UI
+            for (let retry = 0; retry < 10; retry++) {
+                // Preferred clickable elements
+                const clickableCands = document.querySelectorAll('div[role="button"], a[role="link"], div.x1i10hfl');
+                for (const el of Array.from(clickableCands) as HTMLElement[]) {
+                    if (el.offsetParent === null) continue;
+                    const txt = el.innerText?.toLowerCase().trim() || '';
+                    if (openTriggers.some(t => txt.includes(t))) {
+                        openBtn = el;
+                        break;
+                    }
                 }
-            }
 
-            // Fallback
-            if (!openBtn) {
-                openBtn = this.findVisibleElementByText(['Bạn đang nghĩ gì', "What's on your mind", "Tạo bài viết", "Create post"]);
-            }
-
-            if (!openBtn) {
-                const triggers = FACEBOOK_SELECTORS.CREATE_POST_BUTTONS;
-                for (const sel of triggers) {
-                    const el = document.querySelector(sel) as HTMLElement;
-                    if (el && el.offsetParent !== null) { openBtn = el; break; }
+                if (!openBtn) {
+                    openBtn = this.findVisibleElementByText(['Bạn đang nghĩ gì', "What's on your mind", "Tạo bài viết", "Create post"]);
                 }
+
+                if (!openBtn) {
+                    const triggers = FACEBOOK_SELECTORS.CREATE_POST_BUTTONS;
+                    for (const sel of triggers) {
+                        const el = document.querySelector(sel) as HTMLElement;
+                        if (el && el.offsetParent !== null) { openBtn = el; break; }
+                    }
+                }
+
+                if (openBtn) break;
+                
+                if (openBtn) break;
+                
+                const msg = `⏳ Tìm nút "Bạn đang nghĩ gì?"... (${retry + 1}/10)`
+                console.log(msg);
+                this.updateDebugOverlay(msg)
+                await this.wait(5000);
             }
 
-            if (!openBtn) throw new Error('Không tìm thấy nút tạo bài viết')
+            if (!openBtn) throw new Error('Không tìm thấy nút tạo bài viết (Hệ thống đã chờ 50 giây)')
+            this.updateDebugOverlay('🖱️ Đã tìm thấy nút. Đang mở khung soạn thảo...')
             openBtn.click()
             await this.wait(4000)
 
             // 2. Type Caption (if any)
             if (config.post.content) {
+                this.updateDebugOverlay('⌨️ Đang nhập nội dung bài viết...')
                 let editor: HTMLElement | null = null;
                 const dialogs = document.querySelectorAll('[role="dialog"]');
                 
@@ -596,7 +813,7 @@ class PostPublisher {
             if (!nextBtn) {
                  const buttons = document.querySelectorAll('div[role="button"]');
                  for (const btn of Array.from(buttons) as HTMLElement[]) {
-                     const t = btn.innerText?.toLowerCase().trim() || '';
+                     const t = (btn.innerText || btn.textContent)?.toLowerCase().trim() || '';
                      if (t === 'tiếp' || t === 'next') {
                          nextBtn = btn;
                          break;
@@ -638,7 +855,7 @@ class PostPublisher {
             if (!publishBtn) {
                 const buttons = document.querySelectorAll('div[role="button"]');
                 for (const btn of Array.from(buttons) as HTMLElement[]) {
-                    const t = btn.innerText?.toLowerCase().trim() || '';
+                    const t = (btn.innerText || btn.textContent)?.toLowerCase().trim() || '';
                     if (['đăng', 'post', 'publish', 'chia sẻ', 'chia sẻ ngay', 'share'].includes(t)) {
                         publishBtn = btn;
                         break;
@@ -648,6 +865,7 @@ class PostPublisher {
 
             if (!publishBtn) throw new Error('Không tìm thấy nút Đăng bài (Đã thử mọi selector)')
             
+            this.updateDebugOverlay('🚀 Nhấn nút "Đăng". Chờ FB xử lý...')
             publishBtn.click()
             
             console.log('⏳ [Feed DOM] Đang xuất bản...')
@@ -669,6 +887,74 @@ class PostPublisher {
         } catch (e) {
             console.error('💥 [Feed DOM] Exception:', e)
             return { success: false, error: e instanceof Error ? e.message : 'Unknown' }
+        }
+    }
+
+    private async showDebugOverlay(initialMsg: string) {
+        if (this.debugOverlay) return
+        
+        // Wait for document.body to be ready (Max 10 seconds)
+        for (let i = 0; i < 20; i++) {
+            if (document.body) break;
+            await this.wait(500);
+        }
+
+        if (!document.body) {
+            console.error('❌ [PUBLISH] CRITICAL: document.body not found after 10s. Cannot show overlay.')
+            return
+        }
+
+        this.debugOverlay = document.createElement('div')
+        this.debugOverlay.id = 'fb-auto-status-overlay'
+        Object.assign(this.debugOverlay.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            width: '320px',
+            padding: '15px',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            color: '#ffffff',
+            borderRadius: '12px',
+            zIndex: '999999', // Extra high z-index
+            fontFamily: 'Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+            fontSize: '14px',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+            borderLeft: '5px solid #0084ff',
+            pointerEvents: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+        })
+        
+        this.debugOverlay.innerHTML = `
+            <div style="font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 5px; color: #0084ff; display: flex; justify-content: space-between;">
+                <span>🤖 Facebook Auto Manager</span>
+                <span style="font-size: 10px; color: #888;">${this.pageLoadId}</span>
+            </div>
+            <div id="fb-auto-status-msg" style="line-height: 1.4;">${initialMsg}</div>
+            <div style="font-size: 11px; color: #aaa; margin-top: 5px;">
+                Vui lòng không đóng hoặc chuyển tab
+            </div>
+        `
+        document.body.appendChild(this.debugOverlay)
+    }
+
+    private updateDebugOverlay(msg: string) {
+        if (!this.debugOverlay) {
+            this.showDebugOverlay(msg);
+            return;
+        }
+        const msgEl = document.getElementById('fb-auto-status-msg')
+        if (msgEl) {
+            msgEl.innerText = msg
+            console.log(`📢 [OVERLAY] ${msg}`)
+        }
+    }
+
+    private removeDebugOverlay() {
+        if (this.debugOverlay) {
+            this.debugOverlay.remove()
+            this.debugOverlay = null
         }
     }
 
@@ -710,7 +996,6 @@ class PostPublisher {
             targetInput.files = dataTransfer.files
             targetInput.dispatchEvent(new Event('change', { bubbles: true }))
             targetInput.dispatchEvent(new Event('input', { bubbles: true }))
-
             return true
         } catch (e) {
             console.error('❌ [Feed] File injection error:', e)
@@ -758,22 +1043,27 @@ class PostPublisher {
     }
 
     private findVisibleElementByText(texts: string[]): HTMLElement | null {
-        const dialogs = document.querySelectorAll('[role="dialog"]')
-        const root = dialogs.length > 0 ? dialogs[dialogs.length - 1] : document.body
+        try {
+            const dialogs = document.querySelectorAll('[role="dialog"]')
+            const root = dialogs.length > 0 ? dialogs[dialogs.length - 1] : document.body
+            if (!root) return null;
 
-        const candidates = root.querySelectorAll('span, div, button, [role="button"]')
-        // Lật ngược thứ tự để ưu tiên click vào phần tử con (sâu nhất) trước, tránh click nhầm vào các thẻ div bao bọc khổng lồ bên ngoài.
-        for (const el of Array.from(candidates).reverse() as HTMLElement[]) {
-            if (el.offsetParent === null) continue;
-            let t = el.innerText?.trim() || '';
-            let tLower = t.toLowerCase();
-            if (texts.some(txt => {
-                let txtLower = txt.toLowerCase();
-                return tLower === txtLower || tLower.includes(txtLower);
-            })) {
-                return el;
+            const candidates = root.querySelectorAll('span, div, button, [role="button"]')
+            // Lật ngược thứ tự để ưu tiên click vào phần tử con (sâu nhất) trước, tránh click nhầm vào các thẻ div bao bọc khổng lồ bên ngoài.
+            for (const el of Array.from(candidates).reverse() as HTMLElement[]) {
+                if (el.offsetParent === null) continue;
+                let t = el.innerText?.trim() || '';
+                let tLower = t.toLowerCase();
+                if (texts.some(txt => {
+                    let txtLower = txt.toLowerCase();
+                    return tLower === txtLower || tLower.includes(txtLower);
+                })) {
+                    // Trả về chính nó nếu nó là button, hoặc tìm cha gần nhất là button/link
+                    const interactive = el.closest('button, [role="button"], a');
+                    return (interactive as HTMLElement) || el;
+                }
             }
-        }
+        } catch (e) { console.warn('findVisibleElementByText error:', e) }
         return null;
     }
 
@@ -783,3 +1073,14 @@ class PostPublisher {
 }
 
 export const postPublisher = new PostPublisher()
+
+// Bootstrap with safety
+try {
+    postPublisher.init();
+} catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Unknown Fatal Error';
+    console.error('💥 FATALLY FAILED TO INIT POST PUBLISHER:', e);
+    if (sessionStorage.getItem('fb_publish_pending_config')) {
+        alert('Extension Error: ' + errorMsg);
+    }
+}

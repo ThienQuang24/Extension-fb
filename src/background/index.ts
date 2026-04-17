@@ -415,11 +415,13 @@ async function processNextMatrixSearch(tabId: number): Promise<void> {
     // Navigate to appropriate page
     let targetUrl: string
     if (searchItem.isGeneral) {
-        // General Facebook search
-        targetUrl = `https://www.facebook.com/search/posts?q=${encodeURIComponent(searchItem.keyword)}`
+        // General Facebook search with "Most Recent" filter
+        targetUrl = `https://www.facebook.com/search/posts?q=${encodeURIComponent(searchItem.keyword)}&filters=${encodeURIComponent('eyJzb3J0X2tleSI6InNvcnRfbW9zdF9yZWNlbnQifQ==')}`
     } else {
-        // Group search - navigate to group first
-        targetUrl = searchItem.groupUrl!
+        // Group search - navigate to the group's search results directly
+        // Ensure we strip trailing slashes and handle cases where groupUrl has query params
+        const baseUrl = searchItem.groupUrl!.split('?')[0].replace(/\/$/, '')
+        targetUrl = `${baseUrl}/search/?q=${encodeURIComponent(searchItem.keyword)}`
     }
 
     // Get current page load ID to wait for new page
@@ -675,6 +677,17 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
         return { success: false, error: 'Could not find or create Facebook tab' }
     }
 
+    try {
+        // Bắt buộc bật tab Facebook lên trên cùng để tránh bị trình duyệt đóng băng (Chrome background throttling)
+        const activeTab = await chrome.tabs.get(tabId)
+        if (activeTab.windowId) {
+            await chrome.windows.update(activeTab.windowId, { focused: true })
+        }
+        await chrome.tabs.update(tabId, { active: true })
+    } catch(err) {
+        console.warn('⚠️ [PUBLISH] Could not focus window/tab. It might be already in focus.', err)
+    }
+
     currentState = { type: 'IDLE' }
 
     try {
@@ -687,12 +700,23 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
             return { success: false, error: 'Post or fanpage not found' }
         }
 
+        // Apply includeAuthor setting if enabled
+        const clonedPost = { ...post }
+        try {
+            const storageResult = await chrome.storage.local.get('includeAuthor')
+            if (storageResult.includeAuthor === true && clonedPost.authorName) {
+                clonedPost.content = `${clonedPost.content}\n\nTác giả: ${clonedPost.authorName}`
+            }
+        } catch (err) {
+            console.error('Failed to read includeAuthor', err)
+        }
+
         // 1. Send START command (Fire and Forget)
         console.log(`🚀 [PUBLISH] Sending Start Signal to tab ${tabId}...`)
         const startResponse = await sendToContentScript(tabId, {
             type: 'PUBLISH_POST',
             data: {
-                post,
+                post: clonedPost,
                 fanpageUrl: fanpage.url,
                 fbPageId: fanpage.fbPageId
             }
@@ -707,7 +731,7 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
         // 2. Start Polling Loop
         console.log('⏳ [PUBLISH] Process started. Entering polling loop...')
         const POLLING_INTERVAL = 2000
-        const MAX_POLLING_TIME = 90000 // 90 seconds timeout
+        const MAX_POLLING_TIME = 180000 // 180 seconds timeout (Increased for heavy FB loading)
         const startTime = Date.now()
         let currentPageLoadId: string | undefined
 
@@ -728,9 +752,24 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                 if (readyState.ready) {
                     currentPageLoadId = readyState.pageLoadId
                     console.log('✅ [PUBLISH] Tab reloaded and ready. Resuming poll...')
-                    // Note: Ideally, we should re-send commands if state was lost, 
-                    // but for now we assume content script might have persisted state or failed.
-                    // The content script persistence logic handles this via sessionStorage.
+                    
+                    // ACTIVE RESUMPTION: Check if content script is idle after reload.
+                    // If it is, re-send the publish command to kickstart it.
+                    const freshStatus = await sendToContentScript(tabId, { type: 'GET_PUBLISH_STATUS' })
+                    if (freshStatus.success && freshStatus.data?.status === 'idle') {
+                        console.log('🔄 [PUBLISH] Status is IDLE after reload. Re-sending start signal...')
+                        const resendResult = await sendToContentScript(tabId, { 
+                            type: 'PUBLISH_POST', 
+                            data: { 
+                                post: post, 
+                                fanpageUrl: fanpage.url, 
+                                fbPageId: fanpage.fbPageId 
+                            } 
+                        })
+                        if (!resendResult.success) {
+                            console.warn('⚠️ [PUBLISH] Failed to re-send start signal:', resendResult.error)
+                        }
+                    }
                 }
             }
 
@@ -763,7 +802,7 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
         }
 
         publishingLocks.delete(data.postId)
-        return { success: false, error: 'Publishing timed out (90s)' }
+        return { success: false, error: 'Publishing timed out (180s)' }
 
     } catch (error) {
         publishingLocks.delete(data.postId)

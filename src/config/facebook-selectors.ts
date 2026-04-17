@@ -92,7 +92,10 @@ export const FACEBOOK_SELECTORS = {
         TITLE_INPUT: 'input[placeholder="Tiêu đề thước phim"], input[placeholder="Describe your reel..."]',
         NEXT_BUTTON: 'div[role="button"]:has(span:nth-child(1))', // Broad, will use text matching in code
         PUBLISH_BUTTON: 'div[role="button"]:has(span:nth-child(1))', // Broad, will use text matching in code
-    }
+    },
+
+    // Profile Management
+    SWITCH_PROFILE_BUTTON: ['Chuyển ngay', 'Switch Now', 'Chuyển', 'Switch']
 }
 
 export const FB_URLS = {

@@ -2,6 +2,14 @@
   <div class="schedule-manager">
     <h1>Lịch đăng bài</h1>
 
+    <!-- GLOBAL CONFIG SECTION -->
+    <div class="global-settings">
+      <label class="checkbox-label">
+        <input type="checkbox" v-model="includeAuthor" />
+        <span style="font-weight: bold; color: #d73a49">Bao gồm "Tác giả: [Tên]" ở cuối mỗi bài viết</span>
+      </label>
+    </div>
+
     <!-- AUTO-SCHEDULER SECTION -->
     <div class="auto-scheduler-section">
       <h2>🤖 Tự động lên lịch toàn bộ</h2>
@@ -209,7 +217,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useSchedulesStore } from '@/stores/schedules'
 import { usePostsStore } from '@/stores/posts'
 import { useFanpagesStore } from '@/stores/fanpages'
@@ -220,6 +228,9 @@ const schedulesStore = useSchedulesStore()
 const postsStore = usePostsStore()
 const fanpagesStore = useFanpagesStore()
 const route = useRoute()
+
+// Global settings
+const includeAuthor = ref(false)
 
 // Manual scheduling state
 const selectedPostId = ref<number | ''>('')
@@ -266,6 +277,16 @@ onMounted(async () => {
     fanpagesStore.loadFanpages()
   ])
 
+  // Load global settings
+  try {
+    const storage = await chrome.storage.local.get('includeAuthor')
+    if (storage.includeAuthor !== undefined) {
+      includeAuthor.value = Boolean(storage.includeAuthor)
+    }
+  } catch(e) {
+    console.error(e)
+  }
+
   // Check if postId in query params
   const postId = route.query.postId
   if (postId) {
@@ -274,6 +295,12 @@ onMounted(async () => {
   
   // Generate initial preview
   updateAutoPreview()
+})
+
+watch(includeAuthor, async (newVal) => {
+  try {
+    await chrome.storage.local.set({ includeAuthor: newVal })
+  } catch(e) {}
 })
 
 // Auto-scheduler computed
@@ -404,6 +431,15 @@ h1 {
 
 h2 {
   font-size: 18px;
+}
+
+.global-settings {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border-left: 4px solid #d73a49;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .schedule-form {
