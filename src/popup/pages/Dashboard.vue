@@ -15,8 +15,22 @@
       <div class="stat-card">
         <div class="stat-icon">📄</div>
         <div class="stat-content">
-          <div class="stat-value">{{ fanpagesStore.totalFanpages }}</div>
-          <div class="stat-label">Fanpages</div>
+          <div class="stat-value">
+            {{ fanpagesStore.enabledFanpages.length }}
+            <span class="stat-total">/ {{ fanpagesStore.totalFanpages }}</span>
+          </div>
+          <div class="stat-label">Fanpages (Đang bật)</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+          <div class="stat-value">
+            {{ groupsStore.enabledGroupsCount }}
+            <span class="stat-total">/ {{ groupsStore.totalGroups }}</span>
+          </div>
+          <div class="stat-label">Nhóm (Đang bật)</div>
         </div>
       </div>
 
@@ -24,7 +38,7 @@
         <div class="stat-icon">✅</div>
         <div class="stat-content">
           <div class="stat-value">{{ postsStore.publishedPosts.length }}</div>
-          <div class="stat-label">Đã đăng</div>
+          <div class="stat-label">Bài đã đăng</div>
         </div>
       </div>
 
@@ -32,7 +46,7 @@
         <div class="stat-icon">⏰</div>
         <div class="stat-content">
           <div class="stat-value">{{ schedulesStore.pendingSchedules.length }}</div>
-          <div class="stat-label">Chờ đăng</div>
+          <div class="stat-label">Đang chờ đăng</div>
         </div>
       </div>
     </div>
@@ -45,13 +59,17 @@
           <span class="btn-icon">🔍</span>
           <span>Bắt đầu tìm kiếm</span>
         </button>
+        <button class="action-btn" @click="$router.push('/groups')">
+          <span class="btn-icon">👥</span>
+          <span>Quản lý Nhóm</span>
+        </button>
         <button class="action-btn" @click="syncFanpages">
           <span class="btn-icon">🔄</span>
-          <span>Sync Fanpages</span>
+          <span>Cập nhật Fanpage</span>
         </button>
         <button class="action-btn" @click="$router.push('/keywords')">
           <span class="btn-icon">➕</span>
-          <span>Thêm từ khóa</span>
+          <span>Quản lý từ khóa</span>
         </button>
         <button class="action-btn" @click="openFacebook">
           <span class="btn-icon">📘</span>
@@ -91,11 +109,13 @@
 import { onMounted, computed } from 'vue'
 import { usePostsStore } from '@/stores/posts'
 import { useFanpagesStore } from '@/stores/fanpages'
+import { useGroupsStore } from '@/stores/groups'
 import { useSchedulesStore } from '@/stores/schedules'
 import { exportPostsToExcel } from '@/utils/excel-export'
 
 const postsStore = usePostsStore()
 const fanpagesStore = useFanpagesStore()
+const groupsStore = useGroupsStore()
 const schedulesStore = useSchedulesStore()
 
 const recentPosts = computed(() => postsStore.posts.slice(0, 5))
@@ -104,6 +124,7 @@ onMounted(async () => {
   await Promise.all([
     postsStore.loadPosts(),
     fanpagesStore.loadFanpages(),
+    groupsStore.loadGroups(),
     schedulesStore.loadSchedules()
   ])
 })
@@ -168,9 +189,15 @@ h2 {
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: bold;
   color: #0366d6;
+}
+
+.stat-total {
+  font-size: 14px;
+  color: #8792a2;
+  font-weight: normal;
 }
 
 .stat-label {

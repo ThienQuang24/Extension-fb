@@ -23,7 +23,8 @@ class FacebookScraper {
 
     async startSearch(config: SearchConfig): Promise<MessageResponse> {
         if (this.isRunning) {
-            return { success: false, error: 'Search is already running' }
+            console.log('🔄 [SCRAPER] Search already running. Stopping previous and starting new...')
+            this.stopSearch()
         }
 
         this.isRunning = true
@@ -364,17 +365,35 @@ class FacebookScraper {
             const authorName = this.cleanContent(rawAuthorName)
             const authorUrl = authorLink?.href || ''
 
-            const contentDivs = element.querySelectorAll(FACEBOOK_SELECTORS.POST_CONTENT)
+            const rawDivs = Array.from(element.querySelectorAll(FACEBOOK_SELECTORS.POST_CONTENT)) as HTMLElement[]
+            
+            // Filter to keep only the most specific/deepest DIVs that aren't contained within each other
+            // This prevents innerText duplication from parent/child relationship
+            const contentDivs = rawDivs.filter(div => {
+                return !rawDivs.some(other => other !== div && other.contains(div))
+            })
+
             let content = ''
             if (contentDivs.length > 0) {
                 contentDivs.forEach(div => {
-                    const text = (div as HTMLElement).innerText
-                    if (text && text.length > 2) content += text + '\n'
+                    const text = div.innerText?.trim()
+                    if (text && text.length > 1) {
+                        // Avoid adding exact duplicate fragments consecutively
+                        if (!content.includes(text)) {
+                            content += text + '\n'
+                        }
+                    }
                 })
             } else {
-                const autoDivs = element.querySelectorAll('div[dir="auto"]')
-                autoDivs.forEach(div => {
-                    if (div.textContent !== rawAuthorName) content += (div as HTMLElement).innerText + '\n'
+                // Secondary fallback only if primary selectors fail
+                const autoDivs = Array.from(element.querySelectorAll('div[dir="auto"]')) as HTMLElement[]
+                const uniqueAuto = autoDivs.filter(div => !autoDivs.some(other => other !== div && other.contains(div)))
+                
+                uniqueAuto.forEach(div => {
+                    const text = div.innerText?.trim()
+                    if (text && text !== rawAuthorName && !content.includes(text)) {
+                        content += text + '\n'
+                    }
                 })
             }
             content = this.cleanContent(content)

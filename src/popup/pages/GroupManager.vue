@@ -7,23 +7,23 @@
       </div>
       <button 
         class="btn btn-primary sync-btn" 
-        :disabled="isSyncing"
+        :disabled="groupsStore.isSyncing"
         @click="syncGroups"
       >
-        <span v-if="isSyncing" class="spinner"></span>
+        <span v-if="groupsStore.isSyncing" class="spinner"></span>
         <span v-else>🔄</span>
-        {{ isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ Nhóm' }}
+        {{ groupsStore.isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ Nhóm' }}
       </button>
     </div>
 
     <!-- Stats -->
     <div class="stats-row">
       <div class="stat-card">
-        <span class="stat-value">{{ groups.length }}</span>
+        <span class="stat-value">{{ groupsStore.totalGroups }}</span>
         <span class="stat-label">Tổng nhóm</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">{{ enabledGroupsCount }}</span>
+        <span class="stat-value">{{ groupsStore.enabledGroupsCount }}</span>
         <span class="stat-label">Đã bật</span>
       </div>
     </div>
@@ -96,75 +96,54 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { db, Group } from '@/db/schema'
+import { Group } from '@/db/schema'
+import { useGroupsStore } from '@/stores/groups'
 
-const groups = ref<Group[]>([])
+const groupsStore = useGroupsStore()
 const searchQuery = ref('')
-const isSyncing = ref(false)
-
-const loadGroups = async () => {
-  groups.value = await db.groups.toArray()
-}
 
 const filteredGroups = computed(() => {
-  if (!searchQuery.value) return groups.value
+  if (!searchQuery.value) return groupsStore.groups
   const query = searchQuery.value.toLowerCase()
-  return groups.value.filter(g => 
+  return groupsStore.groups.filter(g => 
     g.name.toLowerCase().includes(query) || 
     g.fbGroupId.includes(query)
   )
 })
 
-const enabledGroupsCount = computed(() => {
-  return groups.value.filter(g => g.enabled).length
-})
-
 const toggleGroup = async (group: Group) => {
-  const newStatus = !group.enabled
-  await db.groups.update(group.id!, { enabled: newStatus })
-  group.enabled = newStatus
+  await groupsStore.toggleGroup(group.id!)
 }
 
 const setAllGroupsStatus = async (status: boolean) => {
-  const ids = groups.value.map(g => g.id!)
-  await db.groups.where('id').anyOf(ids).modify({ enabled: status })
-  groups.value.forEach(g => g.enabled = status)
+  await groupsStore.setAllGroupsStatus(status)
 }
 
 const enableOnlyFiltered = async () => {
   if (!searchQuery.value) return
   
   const filteredIds = filteredGroups.value.map(g => g.id!)
-  const allIds = groups.value.map(g => g.id!)
+  const allGroups = groupsStore.groups
   
-  // Disable all first, then enable filtered
-  await db.groups.where('id').anyOf(allIds).modify({ enabled: false })
-  await db.groups.where('id').anyOf(filteredIds).modify({ enabled: true })
-  
-  groups.value.forEach(g => {
-    g.enabled = filteredIds.includes(g.id!)
-  })
-}
-
-const syncGroups = async () => {
-  isSyncing.value = true
-  try {
-    const response = await chrome.runtime.sendMessage({ type: 'SYNC_GROUPS' })
-    if (response && response.data && response.data.status === 'navigating') {
-        // Background handles navigation
-        return
-    }
-    await loadGroups()
-  } catch (error) {
-    console.error('Failed to sync groups:', error)
-    alert('Không thể bắt đầu đồng bộ. Hãy chắc chắn bạn đã đăng nhập Facebook.')
-  } finally {
-    // Keep syncing UI for a bit if navigating
-    setTimeout(() => { isSyncing.value = false }, 2000)
+  // Custom logic for filtering remains here but uses groupsStore.updateGroup
+  for (const g of allGroups) {
+      const shouldEnable = filteredIds.includes(g.id!)
+      if (g.enabled !== shouldEnable) {
+          await groupsStore.updateGroup(g.id!, { enabled: shouldEnable })
+      }
   }
 }
 
-onMounted(loadGroups)
+const syncGroups = async () => {
+  try {
+    await groupsStore.syncGroups()
+  } catch (error) {
+    console.error('Failed to sync groups:', error)
+    alert('Không thể bắt đầu đồng bộ. Hãy chắc chắn bạn đã đăng nhập Facebook.')
+  }
+}
+
+onMounted(groupsStore.loadGroups)
 </script>
 
 <style scoped>

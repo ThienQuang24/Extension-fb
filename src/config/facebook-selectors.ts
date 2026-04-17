@@ -101,5 +101,5 @@ export const FACEBOOK_SELECTORS = {
 export const FB_URLS = {
     HOME: 'https://www.facebook.com',
     FANPAGES: 'https://www.facebook.com/pages/?category=your_pages',
-    SEARCH: (keyword: string) => `https://www.facebook.com/search/posts?q=${encodeURIComponent(keyword)}&filters=${encodeURIComponent('eyJzb3J0X2tleSI6InNvcnRfbW9zdF9yZWNlbnQifQ==')}` // Most recent
+    SEARCH: (keyword: string) => `https://www.facebook.com/search/posts?q=${encodeURIComponent(keyword)}`
 }

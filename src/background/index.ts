@@ -258,6 +258,12 @@ async function handleStartSearch(data: any, senderTabId?: number): Promise<Messa
             return { success: false, error: 'Could not find or create Facebook tab' }
         }
 
+        // AUTO-RESET: If search is already running, stop it first
+        if (currentState.type !== 'IDLE') {
+            console.log('🔄 [SEARCH] Search is already running. Stopping and resetting for new request...')
+            await handleStopSearch()
+        }
+
         // Handle MATRIX mode
         if (data.mode === 'MATRIX' && data.keywords && data.keywords.length > 0 && data.groupUrls && data.groupUrls.length > 0) {
             console.log(`🎯 [MATRIX SEARCH] Creating search matrix: ${data.keywords.length} keywords × ${data.groupUrls.length} groups`)
@@ -266,21 +272,21 @@ async function handleStartSearch(data: any, senderTabId?: number): Promise<Messa
             const matrixQueue: Array<{ keyword: string, groupUrl?: string, isGeneral: boolean }> = []
 
             for (const keyword of data.keywords) {
-                // Add general search for this keyword if enabled
-                if (data.includeGeneralSearch) {
-                    matrixQueue.push({
-                        keyword: keyword,
-                        groupUrl: undefined,
-                        isGeneral: true
-                    })
-                }
-
-                // Add keyword search in each group
+                // Add keyword search in each group FIRST
                 for (const groupUrl of data.groupUrls) {
                     matrixQueue.push({
                         keyword: keyword,
                         groupUrl: groupUrl,
                         isGeneral: false
+                    })
+                }
+
+                // Add general search for this keyword at the END if enabled
+                if (data.includeGeneralSearch) {
+                    matrixQueue.push({
+                        keyword: keyword,
+                        groupUrl: undefined,
+                        isGeneral: true
                     })
                 }
             }
@@ -325,8 +331,11 @@ async function handleStartSearch(data: any, senderTabId?: number): Promise<Messa
             await processNextGroup(tabId)
 
             return { success: true }
-        } else {
-            // KEYWORD mode (legacy)
+        }
+
+        // Handle KEYWORD mode or anything else as pure keyword search
+        if (data.mode === 'KEYWORD' || data.keyword) {
+            console.log(`🚀 [SEARCH] Starting keyword search: ${data.keyword}`)
             currentState = {
                 type: 'SEARCH',
                 data: data,
@@ -427,8 +436,8 @@ async function processNextMatrixSearch(tabId: number): Promise<void> {
     // Navigate to appropriate page
     let targetUrl: string
     if (searchItem.isGeneral) {
-        // General Facebook search with "Most Recent" filter
-        targetUrl = `https://www.facebook.com/search/posts?q=${encodeURIComponent(searchItem.keyword)}&filters=${encodeURIComponent('eyJzb3J0X2tleSI6InNvcnRfbW9zdF9yZWNlbnQifQ==')}`
+        // General Facebook search
+        targetUrl = `https://www.facebook.com/search/posts?q=${encodeURIComponent(searchItem.keyword)}`
     } else {
         // Group search - navigate to the group's search results directly
         // Ensure we strip trailing slashes and handle cases where groupUrl has query params

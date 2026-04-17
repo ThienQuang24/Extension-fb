@@ -180,7 +180,7 @@ const searchKeyword = ref('')
 const groupLinks = ref('')
 const matrixKeywords = ref('')
 const matrixGroups = ref('')
-const includeGeneralSearch = ref(true)
+const includeGeneralSearch = ref(false)
 const maxPosts = ref(5000)
 const filterStatus = ref('all')
 
