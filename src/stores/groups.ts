@@ -21,12 +21,19 @@ export const useGroupsStore = defineStore('groups', () => {
     }
 
     async function syncGroups() {
+        if (isSyncing.value) return { status: 'busy' }
         isSyncing.value = true
         try {
+            // 1. Sync current actor groups
             const response = await chrome.runtime.sendMessage({ type: 'SYNC_GROUPS' })
             if (response && response.data && response.data.status === 'navigating') {
                 return { status: 'navigating' }
             }
+
+            // 2. If current actor is successfully synced, then sync enabled fanpages
+            // We do this in background to avoid blocking the UI too much
+            await chrome.runtime.sendMessage({ type: 'SYNC_FANPAGE_GROUPS' })
+            
             await loadGroups()
             return { status: 'success' }
         } catch (error) {
@@ -60,6 +67,11 @@ export const useGroupsStore = defineStore('groups', () => {
         await loadGroups()
     }
 
+    async function deleteAllGroups() {
+        await db.groups.clear()
+        await loadGroups()
+    }
+
     return {
         groups,
         isSyncing,
@@ -71,6 +83,7 @@ export const useGroupsStore = defineStore('groups', () => {
         updateGroup,
         toggleGroup,
         setAllGroupsStatus,
-        deleteGroup
+        deleteGroup,
+        deleteAllGroups
     }
 })

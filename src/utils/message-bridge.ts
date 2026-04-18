@@ -18,6 +18,8 @@ export type MessageType =
     | 'GET_SEARCH_STATUS'
     | 'SYNC_GROUPS'
     | 'GROUPS_SYNCED'
+    | 'SYNC_FANPAGE_GROUPS'
+    | 'SYNC_GROUPS_AS_ACTOR'
 
 export interface Message<T = any> {
     type: MessageType

@@ -49,6 +49,10 @@ export function onExecute() {
                         response = await scraper.syncJoinedGroups()
                         break
 
+                    case 'SYNC_GROUPS_AS_ACTOR':
+                        response = await scraper.syncJoinedGroups(message.data.actorId)
+                        break
+
                     case 'PUBLISH_POST':
                         response = await postPublisher.startPublish(message.data)
                         break

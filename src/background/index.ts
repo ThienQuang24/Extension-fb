@@ -17,6 +17,7 @@ interface ActionState {
 
 let currentState: ActionState = { type: 'IDLE' }
 const publishingLocks = new Set<number>() // Lock by Post ID
+let groupSyncLock = Promise.resolve<any>(null) // Sequential queue for group saving
 
 // Initialize database
 db.open().catch(err => {
@@ -107,6 +108,10 @@ onMessage((message, sender, sendResponse) => {
 
                 case 'PUBLISH_POST':
                     response = await handlePublishPost(message.data, sender.tab?.id)
+                    break
+
+                case 'SYNC_FANPAGE_GROUPS':
+                    response = await handleSyncFanpageGroups(sender.tab?.id)
                     break
 
                 case 'FETCH_IMAGE':
@@ -683,14 +688,40 @@ async function handleSyncGroups(senderTabId?: number): Promise<MessageResponse> 
     }
 
     const response = await sendToContentScript(tabId, { type: 'SYNC_GROUPS' })
-    if (response.success && response.data && response.data.groups) {
-        await handleGroupsSynced(response.data)
-    }
+    // NOTE: We no longer call handleGroupsSynced here manually
+    // because the scraper sends a GROUPS_SYNCED message that is handled by the central listener.
     return response
 }
 
-async function handleGroupsSynced(data: any): Promise<MessageResponse> {
+async function handleSyncFanpageGroups(senderTabId?: number): Promise<MessageResponse> {
+    const tabId = senderTabId || await getFacebookTab()
+    if (!tabId) return { success: false, error: 'Facebook tab not found' }
+
     try {
+        const fanpages = await db.fanpages.toArray()
+        console.log(`📡 [BACKGROUND] Syncing groups for ${fanpages.length} fanpages...`)
+        
+        for (const page of fanpages) {
+            console.log(`🔄 [BACKGROUND] Syncing groups for Page: ${page.name} (${page.fbPageId})`)
+            await sendToContentScript(tabId, { 
+                type: 'SYNC_GROUPS_AS_ACTOR', 
+                data: { actorId: page.fbPageId } 
+            })
+            // NOTE: No manual handleGroupsSynced here. Handled by listener.
+            // Small delay to avoid hammering
+            await new Promise(r => setTimeout(r, 2000))
+        }
+        
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Fanpage group sync failed' }
+    }
+}
+
+async function handleGroupsSynced(data: any): Promise<MessageResponse> {
+    // Sequential queue to prevent race conditions during parallel syncs
+    return groupSyncLock = groupSyncLock.then(async () => {
+        try {
         const { groups } = data
         if (!groups || !Array.isArray(groups)) {
             return { success: false, error: 'Invalid groups data' }
@@ -698,23 +729,47 @@ async function handleGroupsSynced(data: any): Promise<MessageResponse> {
 
         currentState = { type: 'IDLE' }
 
-        for (const group of groups) {
-            const existing = await db.groups.where('fbGroupId').equals(group.fbGroupId).first()
-            if (existing) {
-                await db.groups.update(existing.id!, {
-                    name: group.name,
-                    url: group.url,
-                    syncedAt: new Date()
-                })
-            } else {
-                await db.groups.add(group)
+        // 1. CLEAN SYNC: Delete groups that are NOT enabled (as requested by user)
+        console.log('🧹 [BACKGROUND] Cleaning non-enabled groups...');
+        await db.groups.filter(g => !g.enabled).delete();
+
+        // 2. ATOMIC UPSERT: Save/Update results within a transaction
+        await db.transaction('rw', db.groups, async () => {
+            let newCount = 0;
+            let updateCount = 0;
+
+            for (const group of groups) {
+                // With &fbGroupId unique index and transaction, this check is atomic
+                const existing = await db.groups.where('fbGroupId').equals(group.fbGroupId).first()
+                if (existing) {
+                    // Keep 'isManaged' if it was already true (persistent ownership)
+                    const isManaged = group.isManaged || existing.isManaged;
+                    
+                    await db.groups.update(existing.id!, {
+                        name: group.name,
+                        url: group.url,
+                        isManaged: isManaged,
+                        syncedAt: new Date()
+                    })
+                    updateCount++;
+                } else {
+                    // New group - default to enabled
+                    await db.groups.add({
+                        ...group,
+                        enabled: true
+                    })
+                    newCount++;
+                }
             }
-        }
+            console.log(`✅ [BACKGROUND] Transaction complete. New: ${newCount}, Updated: ${updateCount}`);
+        });
 
         return { success: true, data: { count: groups.length } }
     } catch (error) {
+        console.error('❌ [BACKGROUND] Failed to save groups:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Failed to save groups' }
     }
+    })
 }
 
 async function handlePublishPost(data: any, senderTabId?: number): Promise<MessageResponse> {

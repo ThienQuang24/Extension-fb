@@ -61,6 +61,10 @@ export const useSchedulesStore = defineStore('schedules', () => {
         if (!schedule) return
 
         try {
+            // Update to 'processing' immediately to prevent the background alarm from picking it up
+            // and to update the UI instantly
+            await updateSchedule(scheduleId, { status: 'processing' })
+
             const response = await sendToBackground({
                 type: 'PUBLISH_POST',
                 data: {

@@ -67,6 +67,7 @@ export interface Group {
     enabled: boolean
     privacy?: 'PUBLIC' | 'PRIVATE'
     lastPostAt?: Date
+    isManaged?: boolean
     syncedAt: Date
 }
 
@@ -104,6 +105,60 @@ export class FacebookDatabase extends Dexie {
 
     constructor() {
         super('FacebookExtensionDB')
+
+        // STEP 2: Enable Unique Index on cleaned data (Version 7)
+        this.version(7).stores({
+            keywords: '++id, text, category, enabled',
+            filters: '++id, name, enabled',
+            posts: '++id, fbPostId, keywordUsed, published, crawledAt',
+            fanpages: '++id, fbPageId, name, enabled',
+            groups: '++id, &fbGroupId, name, enabled, isManaged', // UNIQUE INDEX ENABLED
+            schedules: '++id, postId, targetType, fanpageId, groupId, status',
+            postUIDs: '++id, fbPostId, crawledAt'
+        })
+
+        // STEP 1: Deduplicate data in normal mode (Version 6)
+        this.version(6).stores({
+            keywords: '++id, text, category, enabled',
+            filters: '++id, name, enabled',
+            posts: '++id, fbPostId, keywordUsed, published, crawledAt',
+            fanpages: '++id, fbPageId, name, enabled',
+            groups: '++id, fbGroupId, name, enabled, isManaged', // NO UNIQUE YET
+            schedules: '++id, postId, targetType, fanpageId, groupId, status',
+            postUIDs: '++id, fbPostId, crawledAt'
+        }).upgrade(async tx => {
+            // CRITICAL: Clean up duplicates before creating the unique index in next version
+            const groups = await tx.table('groups').toArray();
+            const seen = new Set<string>();
+            const duplicates: number[] = [];
+            
+            for (const g of groups) {
+                if (seen.has(g.fbGroupId)) {
+                    duplicates.push(g.id!);
+                } else {
+                    seen.add(g.fbGroupId);
+                }
+            }
+            
+            if (duplicates.length > 0) {
+                console.log(`[RECOVERY] Deleting ${duplicates.length} duplicate groups.`);
+                await tx.table('groups').bulkDelete(duplicates);
+            }
+        })
+
+        this.version(5).stores({
+            keywords: '++id, text, category, enabled',
+            filters: '++id, name, enabled',
+            posts: '++id, fbPostId, keywordUsed, published, crawledAt',
+            fanpages: '++id, fbPageId, name, enabled',
+            groups: '++id, fbGroupId, name, enabled, isManaged', // NEW
+            schedules: '++id, postId, targetType, fanpageId, groupId, status',
+            postUIDs: '++id, fbPostId, crawledAt'
+        }).upgrade(tx => {
+            return tx.table('groups').toCollection().modify(g => {
+                if (g.isManaged === undefined) g.isManaged = false;
+            });
+        })
 
         this.version(4).stores({
             keywords: '++id, text, category, enabled',

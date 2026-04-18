@@ -2,6 +2,7 @@
 import { Post } from '@/db/schema'
 import { MessageResponse } from '@/utils/message-bridge'
 import { FACEBOOK_SELECTORS, FB_URLS } from '@/config/facebook-selectors'
+import { GroupService } from './group-service'
 
 interface SearchConfig {
     keyword?: string
@@ -526,89 +527,86 @@ class FacebookScraper {
         })
     }
 
-    async syncJoinedGroups(): Promise<MessageResponse> {
+    async syncJoinedGroups(actorId?: string): Promise<MessageResponse> {
         if (this.isRunning) return { success: false, error: 'Scraper is busy' }
         
-        const syncUrl = 'https://www.facebook.com/groups/joins'
-        if (!window.location.href.includes('/groups/joins')) {
-            console.log(`🌐 [SCRAPER] Navigating to groups sync URL: ${syncUrl}`)
-            window.location.href = syncUrl
-            return { success: true, data: { status: 'navigating' } }
-        }
-
         try {
-            console.log('🚀 [SCRAPER] Syncing joined groups...')
+            console.log(`🚀 [SCRAPER] Syncing groups via GraphQL API (Actor: ${actorId || 'Main'})...`);
             
-            // Wait for initial groups to load
-            await this.wait(3000)
-            
-            const uniqueGroups = new Map<string, {name: string, url: string}>()
-            let lastGroupCount = 0
-            let sameCountRetries = 0
-            const MAX_SCROLLS = 30 // Increased limit to find more groups
-            
-            for (let i = 0; i < MAX_SCROLLS; i++) {
-                const groupLinks = Array.from(document.querySelectorAll('a[href*="/groups/"]'))
-                
-                groupLinks.forEach(link => {
-                    const anchor = link as HTMLAnchorElement
-                    const href = anchor.href
-                    
-                    // Group URL pattern: facebook.com/groups/{id}/
-                    const match = href.match(/\/groups\/(\d+)/)
-                    if (match) {
-                        const id = match[1]
-                        const name = anchor.innerText.trim()
-                        if (name && name.length > 2 && !uniqueGroups.has(id)) {
-                            uniqueGroups.set(id, { name, url: href.split('?')[0] })
-                        }
-                    }
-                })
-
-                console.log(`📊 [SCRAPER] Found ${uniqueGroups.size} groups so far...`)
-                
-                if (uniqueGroups.size === lastGroupCount) {
-                    sameCountRetries++
-                    if (sameCountRetries >= 3) {
-                        console.log('🏁 [SCRAPER] No more new groups found. Ending scroll.')
-                        break
-                    }
-                } else {
-                    sameCountRetries = 0
-                }
-                
-                lastGroupCount = uniqueGroups.size
-                
-                // Scroll to bottom
-                window.scrollTo(0, document.body.scrollHeight)
-                await this.wait(2000)
+            // 1. Extract Tokens (fb_dtsg, actorId)
+            const tokens = await this.extractTokens(actorId);
+            if (!tokens) {
+                return { success: false, error: 'Could not extract security tokens. Please refresh Facebook.' };
             }
 
-            const groups = Array.from(uniqueGroups.entries()).map(([id, info]) => ({
-                fbGroupId: id,
-                name: info.name,
-                url: info.url,
-                enabled: true,
-                syncedAt: new Date()
-            }))
-
-            console.log(`✅ [SCRAPER] Found ${groups.length} groups.`)
+            // 2. Call Group Service
+            const result = await GroupService.fetchAllGroups(tokens);
             
-            // Inform background script immediately
-            chrome.runtime.sendMessage({
-                type: 'GROUPS_SYNCED',
-                data: { groups }
-            })
+            if (result.success) {
+                console.log(`✅ [SCRAPER] GraphQL Sync complete for ${tokens.actorId}. Total: ${result.groups.length}`);
+                
+                // Inform background script
+                chrome.runtime.sendMessage({
+                    type: 'GROUPS_SYNCED',
+                    data: { 
+                        groups: result.groups,
+                        actorId: tokens.actorId
+                    }
+                });
 
-            return {
-                success: true,
-                data: { groups }
+                return {
+                    success: true,
+                    data: { groups: result.groups }
+                };
+            } else {
+                return { success: false, error: result.error || 'GraphQL sync failed' };
             }
+
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : 'Sync failed' }
+            console.error('⚠️ [SCRAPER] GraphQL Sync error:', error);
+            return { success: false, error: error instanceof Error ? error.message : 'Sync failed' };
         }
     }
 
+    private async extractTokens(providedActorId?: string): Promise<any> {
+        try {
+            const fb_dtsg = document.querySelector('input[name="fb_dtsg"]') as HTMLInputElement;
+            const actorMatch = document.cookie.match(/c_user=(\d+)/);
+            
+            let dtsgVal = fb_dtsg?.value;
+            if (!dtsgVal) {
+                const scripts = Array.from(document.querySelectorAll('script'));
+                for (const script of scripts) {
+                    const match = script.innerText.match(/["']DTSGInitialData["'],\[\],\{["']token["']:["']([^"']+)["']/);
+                    if (match) {
+                        dtsgVal = match[1];
+                        break;
+                    }
+                }
+            }
+
+            // If actorId is provided, use it. Otherwise extract from context.
+            let actorId = providedActorId;
+            if (!actorId) {
+                actorId = actorMatch ? actorMatch[1] : '';
+                const scripts = Array.from(document.querySelectorAll('script'));
+                for (const script of scripts) {
+                    const match = script.innerText.match(/["']ACCOUNT_ID["']:["']([^"']+)["']/);
+                    if (match) {
+                        actorId = match[1];
+                        break;
+                    }
+                }
+            }
+
+            if (dtsgVal && actorId) {
+                return { fb_dtsg: dtsgVal, actorId: actorId };
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
     getCurrentPosts(): Post[] {
         return this.collectedPosts
     }

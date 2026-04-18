@@ -32,6 +32,7 @@
     <div class="bulk-actions">
       <button class="btn-text" @click="setAllGroupsStatus(true)">🚀 Bật tất cả</button>
       <button class="btn-text" @click="setAllGroupsStatus(false)">🛑 Tắt tất cả</button>
+      <button class="btn-text btn-danger-text" @click="confirmDeleteAll">🗑️ Xóa hết nhóm</button>
     </div>
 
     <!-- Search/Filter -->
@@ -41,11 +42,11 @@
         <input 
           v-model="searchQuery" 
           type="text" 
-          placeholder="Tìm kiếm nhóm..."
+          placeholder="Tìm tên nhóm hoặc ID..."
         />
       </div>
       <button 
-        v-if="searchQuery && filteredGroups.length > 0" 
+        v-if="searchQuery && filteredJoined.length > 0" 
         class="btn btn-outline btn-sm"
         @click="enableOnlyFiltered"
       >
@@ -53,40 +54,34 @@
       </button>
     </div>
 
-    <!-- Group List -->
-    <div class="group-list">
-      <div v-if="filteredGroups.length === 0" class="empty-state">
-        <div class="empty-icon">👥</div>
-        <p v-if="searchQuery">Không tìm thấy nhóm nào khớp với "{{ searchQuery }}"</p>
-        <div v-else>
-          <p>Chưa có danh sách nhóm.</p>
-          <p class="hint">Nhấn "Đồng bộ Nhóm" để lấy danh sách từ Facebook.</p>
-        </div>
-      </div>
+    <!-- Two-Column Group List -->
 
-      <div 
-        v-for="group in filteredGroups" 
-        :key="group.id" 
-        class="group-card"
-        :class="{ 'disabled': !group.enabled }"
-      >
-        <div class="group-info">
-          <div class="group-meta">
+      <!-- Column 2: Joined Groups -->
+    <div class="list-section single-column">
+      <div class="section-header">
+         <span class="section-icon">👤</span>
+         <span class="section-title">Danh sách nhóm ({{ joinedGroups.length }})</span>
+      </div>
+      <div class="group-list">
+        <div v-if="filteredJoined.length === 0" class="empty-mini">
+          {{ searchQuery ? 'Không tìm thấy nhóm nào' : 'Chưa có dữ liệu nhóm' }}
+        </div>
+        <div 
+          v-for="group in filteredJoined" 
+          :key="group.id" 
+          class="group-card"
+          :class="{ 'disabled': !group.enabled }"
+        >
+          <div class="group-info">
             <h3 class="group-name">{{ group.name }}</h3>
             <p class="group-url">{{ group.fbGroupId }}</p>
           </div>
-        </div>
-        
-        <div class="group-actions">
-          <a :href="group.url" target="_blank" class="action-btn link-btn" title="Mở trên FB">🔗</a>
-          <div class="toggle-switch">
-            <input 
-              :id="'toggle-' + group.id" 
-              type="checkbox" 
-              :checked="group.enabled"
-              @change="toggleGroup(group)"
-            />
-            <label :for="'toggle-' + group.id"></label>
+          <div class="group-actions">
+            <a :href="group.url" target="_blank" class="action-btn link-btn">🔗</a>
+            <div class="toggle-switch">
+              <input :id="'toggle-' + group.id" type="checkbox" :checked="group.enabled" @change="toggleGroup(group)" />
+              <label :for="'toggle-' + group.id"></label>
+            </div>
           </div>
         </div>
       </div>
@@ -102,13 +97,12 @@ import { useGroupsStore } from '@/stores/groups'
 const groupsStore = useGroupsStore()
 const searchQuery = ref('')
 
-const filteredGroups = computed(() => {
-  if (!searchQuery.value) return groupsStore.groups
+const joinedGroups = computed(() => groupsStore.groups)
+
+const filteredJoined = computed(() => {
+  if (!searchQuery.value) return joinedGroups.value
   const query = searchQuery.value.toLowerCase()
-  return groupsStore.groups.filter(g => 
-    g.name.toLowerCase().includes(query) || 
-    g.fbGroupId.includes(query)
-  )
+  return joinedGroups.value.filter(g => g.name.toLowerCase().includes(query) || g.fbGroupId.includes(query))
 })
 
 const toggleGroup = async (group: Group) => {
@@ -119,13 +113,18 @@ const setAllGroupsStatus = async (status: boolean) => {
   await groupsStore.setAllGroupsStatus(status)
 }
 
+const confirmDeleteAll = async () => {
+  if (confirm('Bạn có chắc chắn muốn xóa TẤT CẢ các nhóm khỏi cơ sở dữ liệu? Hành động này không thể hoàn tác.')) {
+    await groupsStore.deleteAllGroups()
+  }
+}
+
 const enableOnlyFiltered = async () => {
   if (!searchQuery.value) return
   
-  const filteredIds = filteredGroups.value.map(g => g.id!)
+  const filteredIds = filteredJoined.value.map(g => g.id!)
   const allGroups = groupsStore.groups
   
-  // Custom logic for filtering remains here but uses groupsStore.updateGroup
   for (const g of allGroups) {
       const shouldEnable = filteredIds.includes(g.id!)
       if (g.enabled !== shouldEnable) {
@@ -243,6 +242,15 @@ onMounted(groupsStore.loadGroups)
   text-decoration: underline;
 }
 
+.btn-danger-text {
+  color: #dc3545 !important;
+}
+
+.btn-danger-text:hover {
+  background: #dc354511 !important;
+  color: #c82333 !important;
+}
+
 .btn-outline {
   background: white;
   border: 1px solid #0366d6;
@@ -277,6 +285,46 @@ onMounted(groupsStore.loadGroups)
   color: #1a1f36;
 }
 
+.group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 600px) {
+  .group-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 2px solid #eef1f5;
+  margin-bottom: 4px;
+}
+
+.section-icon {
+  font-size: 16px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4f566b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .group-list {
   display: flex;
   flex-direction: column;
@@ -285,13 +333,17 @@ onMounted(groupsStore.loadGroups)
 
 .group-card {
   background: white;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid #eef1f5;
   display: flex;
   justify-content: space-between;
   align-items: center;
   transition: all 0.2s;
+}
+
+.group-card.managed {
+  border-left: 4px solid #f59e0b; /* Gold/Amber for admin */
 }
 
 .group-card:hover {
@@ -305,18 +357,18 @@ onMounted(groupsStore.loadGroups)
 }
 
 .group-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #1a1f36;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
+  max-width: 200px;
 }
 
 .group-url {
-  font-size: 11px;
+  font-size: 10px;
   color: #8792a2;
   margin: 2px 0 0 0;
   font-family: monospace;
@@ -325,18 +377,19 @@ onMounted(groupsStore.loadGroups)
 .group-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .action-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 6px;
   text-decoration: none;
   background: #f6f8fa;
+  font-size: 12px;
   transition: all 0.2s;
 }
 
@@ -376,8 +429,8 @@ onMounted(groupsStore.loadGroups)
 
 .toggle-switch {
   position: relative;
-  width: 40px;
-  height: 22px;
+  width: 36px;
+  height: 20px;
 }
 
 .toggle-switch input {
@@ -398,7 +451,7 @@ onMounted(groupsStore.loadGroups)
 .toggle-switch label:before {
   position: absolute;
   content: "";
-  height: 16px; width: 16px;
+  height: 14px; width: 14px;
   left: 3px; bottom: 3px;
   background-color: white;
   border-radius: 50%;
@@ -410,7 +463,7 @@ onMounted(groupsStore.loadGroups)
 }
 
 .toggle-switch input:checked + label:before {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 .spinner {
@@ -426,18 +479,14 @@ onMounted(groupsStore.loadGroups)
   to { transform: rotate(360deg); }
 }
 
-.empty-state {
-  padding: 40px 20px;
+.empty-mini {
+  padding: 20px;
   text-align: center;
-  background: white;
+  background: #f8f9fa;
   border-radius: 12px;
   border: 1px dashed #d1d9e0;
-}
-
-.empty-icon {
-  font-size: 40px;
-  margin-bottom: 12px;
-  opacity: 0.5;
+  font-size: 12px;
+  color: #8792a2;
 }
 
 .hint {
