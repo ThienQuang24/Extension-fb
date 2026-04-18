@@ -118,6 +118,13 @@ onMessage((message, sender, sendResponse) => {
                     response = await handleFetchImage(message.data.url)
                     break
 
+                case 'FB_LEARNED_TEMPLATE':
+                    console.log('📖 Learning new API template:', message.data.isGroup ? 'GROUP' : 'PAGE');
+                    const storageKey = message.data.isGroup ? 'fb_api_template_group' : 'fb_api_template_page';
+                    await chrome.storage.local.set({ [storageKey]: message.data });
+                    response = { success: true };
+                    break
+
                 default:
                     response = {
                         success: false,

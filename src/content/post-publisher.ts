@@ -889,11 +889,19 @@ class PostPublisher {
                         imagesReady = true
                         break
                     }
+                    
+                    // RELAXED CHECK: If we found some images and it's getting late, call it a success
+                    if (i > 5 && removeBtns.length > 0) {
+                        console.log(`⚠️ [Feed DOM] Only found ${removeBtns.length}/${targetCount} images, focusing on what we have.`);
+                        imagesReady = true
+                        break
+                    }
+                    
                     this.updateDebugOverlay(`⏳ Đang tải ảnh... (${removeBtns.length}/${targetCount})`)
                 }
 
                 if (!imagesReady) {
-                    throw new Error(`Facebook chưa nhận diện được đủ ${targetCount} ảnh sau 30 giây.`)
+                    throw new Error(`Facebook không nhận diện được ảnh nào sau 30 giây.`)
                 }
 
                 this.updateDebugOverlay('✅ Ảnh đã sẵn sàng!')

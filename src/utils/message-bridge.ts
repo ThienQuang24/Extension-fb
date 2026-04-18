@@ -21,6 +21,7 @@ export type MessageType =
     | 'SYNC_FANPAGE_GROUPS'
     | 'SYNC_GROUPS_AS_ACTOR'
     | 'PUBLISH_FANPAGE_API'
+    | 'FB_LEARNED_TEMPLATE'
 
 export interface Message<T = any> {
     type: MessageType

@@ -88,10 +88,10 @@ export class FanpageService {
             postPublisher.updateDebugOverlay('📡 Đang gửi bài viết lên Facebook...');
 
             // 2. Build GraphQL Mutation
-            const doc_id = "35222657370682144"; // ComposerStoryCreateMutation
+            const hardcodedDocId = "35222657370682144";
             const sessionId = crypto.randomUUID();
 
-            const variables = {
+            const hardcodedVariables = {
                 "input": {
                     "composer_entry_point": "inline_composer",
                     "composer_source_surface": "timeline",
@@ -133,6 +133,9 @@ export class FanpageService {
                 "isFeed": false,
                 "isTimeline": true
             };
+
+            // APPLY LEARNED TEMPLATE
+            const { doc_id, variables } = await FBUtils.applyLearnedTemplate(hardcodedDocId, hardcodedVariables, false);
 
             const params = new URLSearchParams();
             params.append('av', tokens.actorId);

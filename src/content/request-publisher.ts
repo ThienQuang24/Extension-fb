@@ -1,6 +1,4 @@
-/**
- * Request Publisher - Handles Facebook posting via GraphQL APIs
- */
+import { FBUtils } from '@/utils/fb-utils';
 
 export interface GraphQLResponse {
     success: boolean;
@@ -36,10 +34,10 @@ export class RequestPublisher {
             const groupId = this.extractGroupId(config.fanpageUrl) || config.fbPageId;
             if (!groupId) throw new Error('Could not identify target Group ID');
 
-            const doc_id = "35222657370682144"; // User provided ID
+            const hardcodedDocId = "35222657370682144";
             const client_mutation_id = crypto.randomUUID();
 
-            const variables = {
+            const hardcodedVariables = {
                 "input": {
                     "composer_entry_point": "inline_composer",
                     "composer_source_surface": "group",
@@ -50,7 +48,7 @@ export class RequestPublisher {
                         "ranges": [],
                         "text": config.post.content || ""
                     },
-                    "with_tags_ids": [],
+                    "with_tags_ids": null,
                     "inline_activities": [],
                     "audience": {
                         "to_id": groupId
@@ -75,6 +73,9 @@ export class RequestPublisher {
                 "useDefaultActor": false
             };
 
+            // APPLY LEARNED TEMPLATE
+            const { doc_id, variables } = await FBUtils.applyLearnedTemplate(hardcodedDocId, hardcodedVariables, true);
+
             const params = new URLSearchParams();
             params.append('av', tokens.actorId);
             params.append('__user', tokens.actorId);
@@ -83,9 +84,7 @@ export class RequestPublisher {
             params.append('fb_api_req_friendly_name', 'ComposerStoryCreateMutation');
             params.append('variables', JSON.stringify(variables));
             params.append('doc_id', doc_id);
-
-            const jazoest = '2' + Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
-            params.append('jazoest', jazoest);
+            params.append('jazoest', FBUtils.generateJazoest());
 
             const response = await fetch('https://www.facebook.com/api/graphql/', {
                 method: 'POST',

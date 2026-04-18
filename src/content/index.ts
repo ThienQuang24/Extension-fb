@@ -3,11 +3,29 @@ import { scraper } from './facebook-scraper'
 import { fanpageDetector } from './fanpage-detector'
 import { postPublisher } from './post-publisher'
 import { FanpageService } from './fanpage-service'
+import { SNIFFER_CODE } from './sniffer-code'
 import { onMessage, MessageResponse } from '@/utils/message-bridge'
 
 // Export onExecute for CRXJS loader
 export function onExecute() {
     console.log('Facebook Auto Manager: Content script loaded')
+
+    // 1. Inject Sniffer into MAIN world
+    try {
+        const script = document.createElement('script');
+        script.textContent = SNIFFER_CODE;
+        (document.head || document.documentElement).appendChild(script);
+        script.remove();
+    } catch (e) {
+        console.error('Failed to inject sniffer:', e);
+    }
+
+    // 2. Listen for learned templates from Sniffer
+    window.addEventListener('message', (event) => {
+        if (event.data?.type === 'FB_LEARNED_TEMPLATE') {
+            chrome.runtime.sendMessage(event.data);
+        }
+    });
 
     // Listen for messages from popup/background
     onMessage((message, sender, sendResponse) => {

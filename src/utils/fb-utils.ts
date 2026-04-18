@@ -63,4 +63,47 @@ export class FBUtils {
             }
         });
     }
+
+    /**
+     * Merges hardcoded variables with a learned template from Facebook's live UI
+     */
+    static async applyLearnedTemplate(hardcodedDocId: string, hardcodedVariables: any, isGroup: boolean): Promise<{ doc_id: string, variables: any }> {
+        try {
+            const storageKey = isGroup ? 'fb_api_template_group' : 'fb_api_template_page';
+            const data = await chrome.storage.local.get(storageKey);
+            const learned = data[storageKey] as { doc_id: string, variables: any, timestamp: number } | undefined;
+
+            if (!learned) return { doc_id: hardcodedDocId, variables: hardcodedVariables };
+
+            console.log(`🧠 [FBUtils] Merging with learned ${isGroup ? 'GROUP' : 'PAGE'} template (${new Date(learned.timestamp).toLocaleTimeString()})`);
+
+            // Use learned doc_id if available
+            const finalDocId = learned.doc_id || hardcodedDocId;
+            
+            // Start with learned variables as base structure
+            const finalVariables = JSON.parse(JSON.stringify(learned.variables));
+
+            // Content-critical keys that MUST come from our hardcoded source
+            const contentKeys = [
+                'idempotence_token', 'source', 'attachments', 'message', 
+                'audience', 'actor_id', 'client_mutation_id', 'logging'
+            ];
+
+            // Re-apply our dynamic content onto the learned structure
+            if (finalVariables.input && hardcodedVariables.input) {
+                for (const key of contentKeys) {
+                    if (hardcodedVariables.input[key] !== undefined) {
+                        finalVariables.input[key] = hardcodedVariables.input[key];
+                    }
+                }
+            }
+
+            // Sync top-level flags from hardcoded if learned is missing them 
+            // but usually we want to trust the learned one for everything else
+            return { doc_id: finalDocId, variables: finalVariables };
+        } catch (e) {
+            console.warn('⚠️ [FBUtils] Failed to apply learned template, using hardcoded.', e);
+            return { doc_id: hardcodedDocId, variables: hardcodedVariables };
+        }
+    }
 }
