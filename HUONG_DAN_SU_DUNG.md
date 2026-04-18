@@ -1,75 +1,63 @@
 # HƯỚNG DẪN SỬ DỤNG FACEBOOK AUTO MANAGER (CHROME EXTENSION)
 
-Chào mừng bạn đến với **Facebook Auto Manager v2**. Đây là công cụ đắc lực giúp bạn tự động hóa việc tìm kiếm, thu thập bài viết (crawl) từ các hội nhóm, từ khóa trên Facebook và hỗ trợ tự động đăng lại lên Fanpage của bạn một cách nhanh chóng và tiện lợi.
-
-Dưới đây là hướng dẫn chi tiết cách cài đặt và sử dụng ứng dụng.
+Chào mừng bạn đến với **Facebook Auto Manager v2**. Đây là công cụ đắc lực giúp bạn tự động hóa việc tìm kiếm, thu thập bài viết (crawl) từ các hội nhóm, từ khóa trên Facebook và hỗ trợ tự động đăng lại lên Fanpage hoặc Nhóm của bạn một cách nhanh chóng và tiện lợi bằng công nghệ API.
 
 ---
 
 ## I. HƯỚNG DẪN CÀI ĐẶT
 
-Do đây là một Extension tự phát triển, bạn cần cài đặt thông qua chế độ dành cho Nhà phát triển (Developer Mode) của Chrome.
-
 ### Bước 1: Build source code (Nếu chưa có sẵn thư mục dist)
-Nếu bạn chỉ nhận được mã nguồn (source code) và chưa có sẵn thư mục `dist/`, bạn cần chạy các lệnh sau trong terminal/cmd tại thư mục chứa source code:
+Nếu bạn chỉ nhận được mã nguồn (source code) và chưa có sẵn thư mục `dist/`, bạn cần chạy các lệnh sau trong terminal:
 ```bash
 npm install
 npm run build
 ```
-Sau khi chạy xong, một thư mục `dist/` sẽ được tạo ra.
 
 ### Bước 2: Cài đặt vào Google Chrome
-1. Mở trình duyệt Google Chrome.
-2. Tại thanh địa chỉ, nhập: `chrome://extensions/` và nhấn Enter.
-3. Ở góc trên cùng bên phải, bật chế độ **"Developer mode"** (Chế độ cho nhà phát triển).
-4. Nhấn vào nút **"Load unpacked"** (Tải tiện ích đã giải nén) ở góc trên cùng bên trái.
-5. Tìm đến thư mục dự án của extension, và chọn thư mục `dist/`.
-6. Sau khi tải thành công, bạn sẽ thấy icon của **Facebook Auto Manager** xuất hiện trên thanh công cụ của Chrome. Bạn có thể ghim icon này (pin) để tiện sử dụng.
+1. Mở trình duyệt Google Chrome, truy cập: `chrome://extensions/`.
+2. Bật **"Developer mode"** (Chế độ cho nhà phát triển).
+3. Nhấn **"Load unpacked"** (Tải tiện ích đã giải nén) và chọn thư mục `dist/` của dự án.
+4. Ghim icon Extension lên thanh công cụ để sử dụng.
 
 ---
 
-## II. HƯỚNG DẪN SỬ DỤNG CÁC TÍNH NĂNG CHÍNH
+## II. HƯỚNG DẪN CHI TIẾT CÁC TÍNH NĂNG
 
-### 1. Tính năng Tìm kiếm & Quét bài viết (Crawl Nâng Cao)
-Tiện ích hỗ trợ hai phương thức tìm kiếm chính:
+### 1. Tìm kiếm và Crawl dữ liệu bài viết
+Tính năng này giúp bạn thu thập nội dung từ các nguồn khác nhau trên Facebook để làm kho tư liệu.
 
-*   **Tìm kiếm Từ khóa ma trận (Matrix Search):** 
-    *   **Cách hoạt động:** Cho phép bạn quét kết hợp giữa nhiều "Từ khóa" và nhiều "Nhóm" (Group) khác nhau. 
-    *   **Ví dụ:** Bạn có danh sách 3 nhóm chợ sinh viên, và tổ hợp 5 từ khóa (nhà trọ, điện thoại cũ, tìm việc...). Bằng cách thiết lập ma trận, tool sẽ tự động rảo qua từng nhóm và tìm các bài viết phù hợp.
+*   **Truy cập Menu**: Vào mục **Tìm kiếm & Crawl**.
+*   **Chế độ quét**:
+    *   **Tìm từ khóa**: Quét bài viết theo từ khóa trên toàn Facebook.
+    *   **Quét Group**: Dán danh sách Link các Group để thu thập bài viết mới nhất.
+    *   **Tìm kiếm Ma trận (Nâng cao)**: Kết hợp danh sách Từ khóa + danh sách Group (Hiệu suất cực cao).
+*   **Thiết lập**: Nhập số bài tối đa và nhấn **Bắt đầu**. Hệ thống sẽ tự động thu nạp Ảnh/Nội dung vào kho quản lý.
 
-*   **Quét Group (Nhóm):**
-    *   **Công dụng:** Tự động lướt và thu thập tất cả bài viết mới trong những Group được chỉ định.
-    *   **Cách dùng:** Nhập link trực tiếp/ID của các hội nhóm bạn cần theo dõi, khởi chạy quét, thư giãn và chờ tool lọc bài cho bạn.
-    *   Tính năng *Smart Scroll* (cuộn thông minh) kết hợp *Auto "Xem thêm"* sẽ đảm bảo nội dung bài dài được thu thập đầy đủ mà không bị ngắt quãng. Những popup phiền phức của Facebook cũng sẽ được hệ thống đóng tự động.
+### 2. Quản lý và Đăng bài lên Fanpage (Công nghệ API-First)
+Hệ thống ưu tiên sử dụng API GraphQL để đăng bài với tốc độ cao và cực kỳ ổn định.
 
-### 2. Sử dụng Bộ lọc Thông minh (Smart Filters)
-Để tránh thu thập những bài viết rác, bài đăng không đúng mục đích, hãy thiết lập bộ lọc:
+*   **Tự động chuyển Profile (Smart Context Switch)**: 
+    - Nếu bạn đang ở Facebook cá nhân nhưng chọn đăng vào Fanpage, Extension sẽ tự động hiện thông báo *"🎭 Đang chuyển Profile"*.
+    - Nó sẽ tự động nhấn nút **Chuyển ngay** trên Facebook và tiếp tục quy trình đăng ngay sau khi chuyển vùng thành công.
+*   **Đăng bài**: Chỉ cần chọn bài từ kho và nhấn **Đăng ngay**. Hệ thống sẽ xử lý nạp ảnh và đăng nội dung hoàn toàn tự động.
 
-*   **Từ khóa loại trừ (Negative Keywords):** Nếu bài viết chứa những từ này (VD: "Đa cấp", "Lừa đảo", "Spam làm việc tại nhà..."), bài viết sẽ bị tự động loại bỏ.
-*   **Bắt buộc chứa từ khóa (Required Keywords):** Trái ngược với từ trừ, bạn có thể thiết lập chỉ lưu lại bài khi nó có gắn các từ (VD: "Chính chủ", "Thanh lý").
-*   **Lọc theo nội dung đa phương tiện:** Bạn có thể chọn chỉ lấy bài viết có Hình ảnh / Video, loại bỏ các bài chỉ có text thông thường, hay lọc theo số lượng từ ngữ trong bài viết.
+### 3. Đăng bài vào Nhóm (Groups)
+*   Hỗ trợ đăng bài vào các Nhóm bạn tham gia hoặc quản lý thông qua API.
+*   Trường hợp API bị hạn chế bởi chính sách của Nhóm, hệ thống sẽ tự động chuyển sang **Chế độ Dự phòng (DOM)** để soạn thảo trực tiếp trên trình duyệt, đảm bảo 100% bài viết được gửi đi thành công.
 
-### 3. Đăng bài lên Fanpage (Auto Post)
-Sau khi có được nguồn bài viết dồi dào, bạn có thể chuyển chúng sang Fanpage của mình nhanh chóng:
-
-1.  **Cấu hình Fanpage:** Công cụ tự động quét và nhận diện các Fanpage hiện có mà bạn đang nắm quyền quản trị.
-2.  **Đăng ngay hoặc Lên lịch (Schedule):**
-    *   *Đăng ngay:* Bài viết cùng đầy đủ nội dung, hình ảnh sẽ được đăng trực tiếp lên Fanpage. Tool hỗ trợ copy paste thông minh bằng Lexical editor, bypass các giới hạn chống spam của Faceboook.
-    *   *Lên lịch:* Bạn có thể tích trữ bài và thiết lập để tool tự rải bài ra đăng.
-3.  **Giới hạn an toàn:** Nhằm bảo vệ page, bạn có thể chỉnh được số lượng bài tối đa trong 1 ngày, hoặc khoảng giờ tool được phép hoạt động.
-
-### 4. Quản lý Từ khóa
-Nếu bạn thường xuyên phải làm việc với các ngách nội dung (Niche) khác nhau, tiện ích cho phép:
-*   Phân loại và gom nhóm những Từ khóa thành từng Danh mục riêng.
-*   Tra cứu, lưu lịch sử bộ từ khóa đã sử dụng.
+### 4. Lên lịch đăng bài tự động (Scheduling)
+*   Tại mỗi bài viết trong kho dữ liệu, nhấn nút **Lên lịch (⏰)**.
+*   Chọn thời gian và mục tiêu đăng. Extension sẽ tự động thực thi mọi bước khi đến giờ mà bạn không cần can thiệp thủ công.
 
 ---
 
-## III. MỘT SỐ LƯU Ý QUAN TRỌNG KHI SỬ DỤNG
-*   **⚠ LƯU Ý VỀ TÀI KHOẢN:** Sử dụng tool auto crawler có một tỷ lệ rủi ro có thể khiến tài khoản Facebook của bạn bịcheckpoint (yêu cầu xác minh) hoặc cảnh báo do vi phạm Chính sách của Facebook (ToS).
-*   Hãy **Sử dụng mật độ vừa phải**, ví dụ hạn chế việc quét liên tục 24/24. 
-*   Chia nhỏ thời gian giữa những đợt Post bài, hạn chế setting Post quá nhiều bài (hàng chục bài) vào cùng 1 trang trong thời gian ngắn ngủn.
-*   Ứng dụng hoạt động thông qua việc bật Facebook Web (chạy song song thao tác trên tab), nên vui lòng không đóng quá trình tab đang thực hiện trong lúc tool đang chạy.
+## III. MỘT SỐ LƯU Ý QUAN TRỌNG
+
+> [!IMPORTANT]
+> **Khung trạng thái Overlay**: Khi đang chạy tác vụ, bạn sẽ thấy một khung nhỏ ở góc dưới bên trái màn hình báo cáo trạng thái (Đang tải ảnh, Đang đăng bài...). Đừng đóng khung này để đảm bảo tác vụ không bị ngắt quãng.
+
+> [!TIP]
+> **Xử lý Identity**: Nếu bài đăng không hiển thị hoặc thiếu ảnh, hãy nhấn vào tên Fanpage/Group đó một lần trên trình duyệt để Extension cập nhật lại quyền Quản trị (Token).
 
 ---
 *Chúc bạn có những trải nghiệm tuyệt vời cùng Facebook Auto Manager!*
