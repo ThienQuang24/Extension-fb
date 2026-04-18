@@ -3,6 +3,7 @@ import { Post } from '@/db/schema'
 import { MessageResponse } from '@/utils/message-bridge'
 import { FACEBOOK_SELECTORS } from '@/config/facebook-selectors'
 import { RequestPublisher } from './request-publisher'
+import { FanpageService } from './fanpage-service'
 
 interface PublishConfig {
     post: Post
@@ -32,10 +33,10 @@ class PostPublisher {
     private currentStatus: PublishStatus = { status: 'idle', timestamp: Date.now() }
 
     // Persistent state keys
-    private readonly STATE_KEY = 'fb_publish_state'
-    private readonly STEP_KEY = 'fb_publish_step'
-    private readonly TARGET_ID_KEY = 'fb_publish_target_id'
-    private readonly PENDING_CONFIG_KEY = 'fb_publish_pending_config'
+    public readonly STATE_KEY = 'fb_publish_state'
+    public readonly STEP_KEY = 'fb_publish_step'
+    public readonly TARGET_ID_KEY = 'fb_publish_target_id'
+    public readonly PENDING_CONFIG_KEY = 'fb_publish_pending_config'
 
     constructor() { }
 
@@ -72,6 +73,19 @@ class PostPublisher {
     // Getter for polling
     public getPublishStatus(): PublishStatus {
         return this.currentStatus
+    }
+
+    public setStatus(status: PublishStatus['status'], error?: string) {
+        this.currentStatus = {
+            status,
+            error,
+            timestamp: Date.now()
+        }
+    }
+
+    public setGlobalLock(locked: boolean) {
+        PostPublisher.isGlobalLocked = locked;
+        this.isPublishing = locked;
     }
 
     // New Non-blocking Start Method
@@ -139,8 +153,7 @@ class PostPublisher {
         }
 
         // --- SUCCESS: TARGET IDENTITY CONFIRMED ---
-        // Now it is safe to remove the pending configuration
-        localStorage.removeItem(this.PENDING_CONFIG_KEY)
+        // We keep the configuration for now as a safety net against mid-post reloads.
         this.updateDebugOverlay(`✅ Tư cách: ${currentActor} (Sẵn sàng)`)
 
         // Auto-reset after 180 seconds
@@ -194,7 +207,7 @@ class PostPublisher {
                     // Path: Feed Post (Image/Text)
                     let publishedViaAPI = false;
 
-                    // 1. Try API First for GROUPS
+                    // 1. Try API First for GROUPS or FANPAGES
                     if (config.targetType === 'GROUP') {
                         try {
                             this.updateDebugOverlay('📡 Đang đăng bài qua API Facebook Nhóm...')
@@ -209,12 +222,33 @@ class PostPublisher {
                                 }
                                 publishedViaAPI = true;
                             } else {
-                                console.warn('⚠️ [PUBLISH] GraphQL API failed:', apiResult.error);
+                                console.warn('⚠️ [PUBLISH] GraphQL API (Group) failed:', apiResult.error);
                                 this.updateDebugOverlay(`⚠️ API thất bại: ${apiResult.error}. Đang chuyển sang dự phòng...`)
                                 await this.wait(2000)
                             }
                         } catch (err) {
-                            console.error('❌ [PUBLISH] API exception:', err);
+                            console.error('❌ [PUBLISH] Group API exception:', err);
+                        }
+                    } else if (config.targetType === 'FANPAGE') {
+                        try {
+                            this.updateDebugOverlay('📡 Đang đăng bài qua API Facebook Fanpage...')
+                            const apiResult = await FanpageService.publishToPage(config.fbPageId, config.post.content || '', config.post.images || []);
+                            if (apiResult.success) {
+                                console.log('✅ [PUBLISH] Successfully published Fanpage via GraphQL API.');
+                                this.updateDebugOverlay('🎉 Đăng bài thành công (API)!')
+                                this.currentStatus = {
+                                    status: 'success',
+                                    data: { publishedUrl: apiResult.publishedUrl },
+                                    timestamp: Date.now()
+                                }
+                                publishedViaAPI = true;
+                            } else {
+                                console.warn('⚠️ [PUBLISH] GraphQL API (Fanpage) failed:', apiResult.error);
+                                this.updateDebugOverlay(`⚠️ API thất bại: ${apiResult.error}. Đang chuyển sang dự phòng...`)
+                                await this.wait(2000)
+                            }
+                        } catch (err) {
+                            console.error('❌ [PUBLISH] Fanpage API exception:', err);
                         }
                     }
 
@@ -265,6 +299,12 @@ class PostPublisher {
             // If we are redirecting, the next page load should handle the cleanup
             if (!this.isRedirecting) {
                 console.log('🧹 [PUBLISH] Final cleanup: Resetting flags.')
+                
+                // FINAL CLEANUP of storage on terminal states
+                if (this.currentStatus.status === 'success' || this.currentStatus.status === 'failed') {
+                    localStorage.removeItem(this.PENDING_CONFIG_KEY);
+                }
+
                 this.isPublishing = false
                 PostPublisher.isGlobalLocked = false
                 if (this.publishTimeout) {
@@ -273,6 +313,8 @@ class PostPublisher {
                 }
             } else {
                 console.log('🔄 [PUBLISH] Navigating... Flags preserved for next page load.')
+                // When redirecting, we want the background to know it should keep polling
+                this.currentStatus = { status: 'failed', error: 'REDIRECTING', timestamp: Date.now() };
             }
             sessionStorage.removeItem(this.STEP_KEY)
 
@@ -300,7 +342,6 @@ class PostPublisher {
                 // This prevents the extension from being fooled by "Switch" buttons in sidebars.
                 if (targetId && currentId === targetId) {
                     console.log('✅ [PUBLISH] Active identity matches target! Skipping switch check.')
-                    localStorage.removeItem(this.PENDING_CONFIG_KEY)
                     return false
                 }
 
@@ -308,7 +349,6 @@ class PostPublisher {
                 // we treat it as success. This was the "Old Logic" that worked reliably.
                 if (hasComposer && currentUrl.includes(targetId || '')) {
                     console.log('✨ [PUBLISH] Shortcut: Composer visible on target URL. Proceeding bypass.')
-                    localStorage.removeItem(this.PENDING_CONFIG_KEY)
                     return false
                 }
 
@@ -316,7 +356,6 @@ class PostPublisher {
                 if (isPersonalGroupPost) {
                     if (hasComposer) {
                         console.log('✨ [PUBLISH] Group Post (Personal): Composer is visible. Proceeding.')
-                        localStorage.removeItem(this.PENDING_CONFIG_KEY)
                         return false
                     }
                     // Continue to check for banners ONLY if no composer is found
@@ -402,7 +441,7 @@ class PostPublisher {
         }
     }
 
-    private getCurrentProfileId(): string | null {
+    public getCurrentProfileId(): string | null {
         try {
             // Source 1: JavaScript source objects (STRICTLY ActorID/UserID)
             const scripts = Array.from(document.querySelectorAll('script'))
@@ -762,15 +801,20 @@ class PostPublisher {
 
             // 1. Open Composer
             let openBtn: HTMLElement | null = null;
-            const openTriggers = ['bạn đang nghĩ gì', "what's on your mind", "tạo bài viết", "create post"];
+            const openTriggers = [
+                'bạn đang nghĩ gì', "what's on your mind", 
+                "tạo bài viết", "create post", 
+                "viết nội dung", "write some",
+                "hãy viết gì đó", "share something"
+            ];
 
-            // Loop 10 times x 5 seconds = 50 seconds total wait for UI
-            for (let retry = 0; retry < 10; retry++) {
-                // Preferred clickable elements
-                const clickableCands = document.querySelectorAll('div[role="button"], a[role="link"], div.x1i10hfl');
+            // Loop 12 times x 5 seconds = 60 seconds total wait for UI
+            for (let retry = 0; retry < 12; retry++) {
+                // Preferred clickable elements (Specific FB composer triggers)
+                const clickableCands = document.querySelectorAll('div[role="button"], a[role="link"], div.x1i10hfl, div[aria-label]');
                 for (const el of Array.from(clickableCands) as HTMLElement[]) {
                     if (el.offsetParent === null) continue;
-                    const txt = el.innerText?.toLowerCase().trim() || '';
+                    const txt = (el.innerText || el.getAttribute('aria-label') || '').toLowerCase().trim();
                     if (openTriggers.some(t => txt.includes(t))) {
                         openBtn = el;
                         break;
@@ -994,7 +1038,7 @@ class PostPublisher {
         }
     }
 
-    private async showDebugOverlay(initialMsg: string) {
+    public async showDebugOverlay(initialMsg: string) {
         if (this.debugOverlay) return
 
         // Wait for document.body to be ready (Max 10 seconds)
@@ -1003,47 +1047,76 @@ class PostPublisher {
             await this.wait(500);
         }
 
-        if (!document.body) {
-            console.error('❌ [PUBLISH] CRITICAL: document.body not found after 10s. Cannot show overlay.')
-            return
+        if (!document.body) return
+
+        // Inject Styles for Pulse and Spinner
+        if (!document.getElementById('fb-auto-overlay-styles')) {
+            const style = document.createElement('style')
+            style.id = 'fb-auto-overlay-styles'
+            style.textContent = `
+                @keyframes fb-pulse {
+                    0% { transform: scale(0.95); opacity: 0.8; }
+                    50% { transform: scale(1.1); opacity: 1; }
+                    100% { transform: scale(0.95); opacity: 0.8; }
+                }
+                .fb-pulse-dot {
+                    width: 8px; height: 8px;
+                    background: #10b981;
+                    border-radius: 50%;
+                    display: inline-block;
+                    margin-right: 8px;
+                    box-shadow: 0 0 8px #10b981;
+                    animation: fb-pulse 2s infinite ease-in-out;
+                }
+                .fb-premium-glass {
+                    backdrop-filter: blur(16px) saturate(180%);
+                    -webkit-backdrop-filter: blur(16px) saturate(180%);
+                    background-color: rgba(15, 23, 42, 0.85);
+                    border: 1px solid rgba(255, 255, 255, 0.125);
+                    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+                }
+            `
+            document.head.appendChild(style)
         }
 
         this.debugOverlay = document.createElement('div')
         this.debugOverlay.id = 'fb-auto-status-overlay'
+        this.debugOverlay.className = 'fb-premium-glass'
         Object.assign(this.debugOverlay.style, {
             position: 'fixed',
-            bottom: '20px',
-            right: '20px',
-            width: '320px',
-            padding: '15px',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            color: '#ffffff',
-            borderRadius: '12px',
-            zIndex: '999999', // Extra high z-index
-            fontFamily: 'Segoe UI, Roboto, Helvetica, Arial, sans-serif',
+            bottom: '24px',
+            left: '24px', // CHANGED TO LEFT
+            width: '340px',
+            padding: '18px',
+            color: '#f8fafc',
+            borderRadius: '16px',
+            zIndex: '2147483647', // Max possible z-index
+            fontFamily: 'Outfit, Inter, system-ui, sans-serif',
             fontSize: '14px',
-            boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
-            borderLeft: '5px solid #0084ff',
             pointerEvents: 'none',
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px'
+            gap: '12px',
+            transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
         })
 
         this.debugOverlay.innerHTML = `
-            <div style="font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 5px; color: #0084ff; display: flex; justify-content: space-between;">
-                <span>🤖 Facebook Auto Manager</span>
-                <span style="font-size: 10px; color: #888;">${this.pageLoadId}</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 2px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="fb-pulse-dot"></div>
+                    <span style="font-weight: 700; background: linear-gradient(90deg, #60a5fa, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">FACEBOOK AUTO</span>
+                </div>
+                <span style="font-size: 10px; color: rgba(255,255,255,0.4); font-family: monospace;">ID: ${this.pageLoadId}</span>
             </div>
-            <div id="fb-auto-status-msg" style="line-height: 1.4;">${initialMsg}</div>
-            <div style="font-size: 11px; color: #aaa; margin-top: 5px;">
-                Vui lòng không đóng hoặc chuyển tab
+            <div id="fb-auto-status-msg" style="line-height: 1.5; font-weight: 500; color: #e2e8f0;">${initialMsg}</div>
+            <div style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 4px;">
+                <span>⚡</span> Đang tối ưu hóa tác vụ...
             </div>
         `
         document.body.appendChild(this.debugOverlay)
     }
 
-    private updateDebugOverlay(msg: string) {
+    public updateDebugOverlay(msg: string) {
         if (!this.debugOverlay) {
             this.showDebugOverlay(msg);
             return;
@@ -1055,7 +1128,7 @@ class PostPublisher {
         }
     }
 
-    private removeDebugOverlay() {
+    public removeDebugOverlay() {
         if (this.debugOverlay) {
             this.debugOverlay.remove()
             this.debugOverlay = null

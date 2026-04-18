@@ -802,29 +802,49 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
     currentState = { type: 'IDLE' }
 
     try {
-        // Get post/target data
-        const post = await db.posts.get(data.postId)
-        let target: any
-        let targetUrl = ''
-        let targetId = ''
-
+        const post = await db.posts.get(data.postId);
+        let target, targetUrl = "", targetFbId = "";
+        
         if (data.targetType === 'GROUP') {
-            target = await db.groups.get(data.groupId)
-            targetUrl = target?.url || ''
-            targetId = target?.fbGroupId || ''
+            target = await db.groups.get(data.groupId);
+            targetUrl = target?.url || "";
+            targetFbId = target?.fbGroupId || "";
         } else {
-            target = await db.fanpages.get(data.fanpageId)
-            targetUrl = target?.url || ''
-            targetId = target?.fbPageId || ''
+            target = await db.fanpages.get(data.fanpageId);
+            targetUrl = target?.url || "";
+            targetFbId = target?.fbPageId || "";
         }
 
         if (!post || !target) {
-            publishingLocks.delete(data.postId)
-            return { success: false, error: 'Post or target not found' }
+            publishingLocks.delete(data.postId);
+            return { success: false, error: 'Post or target not found' };
+        }
+
+        // PRIORITY: If target is FANPAGE, use the new high-speed API
+        if (data.targetType === 'FANPAGE') {
+            console.log(`🚀 [PUBLISH] Using high-speed API for Fanpage: ${target.name}`);
+            const apiResponse = await sendToContentScript(tabId, {
+                type: 'PUBLISH_FANPAGE_API',
+                data: {
+                    actorId: target.fbPageId,
+                    content: post.content,
+                    imageUrls: post.images || []
+                }
+            });
+
+            if (apiResponse.success) {
+                console.log('✅ [PUBLISH] API post successful!');
+                await handlePublishSuccess(post, target, data.targetType, apiResponse.data?.publishedUrl);
+                publishingLocks.delete(data.postId);
+                return { success: true, data: { publishedUrl: apiResponse.data?.publishedUrl } };
+            } else {
+                console.error('❌ [PUBLISH] API post failed, falling back to DOM automation:', apiResponse.error);
+                // Fallback to DOM automation below...
+            }
         }
 
         // Resolving 'PAGE' placeholder string to actual numeric ID to fix identity mismatch errors
-        const resolvedPublisherId = (data.publisherId === 'PAGE') ? targetId : (data.publisherId || 'PERSONAL')
+        const resolvedPublisherId = (data.publisherId === 'PAGE') ? targetFbId : (data.publisherId || 'PERSONAL')
 
         // Apply includeAuthor setting if enabled
         const clonedPost = { ...post }
@@ -844,7 +864,7 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
             data: {
                 post: clonedPost,
                 fanpageUrl: targetUrl,
-                fbPageId: targetId,
+                fbPageId: targetFbId,
                 publisherId: resolvedPublisherId,
                 targetType: data.targetType
             }
@@ -891,7 +911,7 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                             data: { 
                                 post: clonedPost, 
                                 fanpageUrl: targetUrl, 
-                                fbPageId: targetId,
+                                fbPageId: targetFbId,
                                 publisherId: resolvedPublisherId,
                                 targetType: data.targetType
                             } 
@@ -920,6 +940,13 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                 }
 
                 if (status.status === 'failed') {
+                    // SPECIAL CASE: Redirecting for profile switch
+                    if (status.error === 'REDIRECTING') {
+                        console.log('🔄 [PUBLISH] Tab is redirecting/switching profile. Continuing to watch...')
+                        await new Promise(r => setTimeout(r, POLLING_INTERVAL * 2));
+                        continue;
+                    }
+
                     console.error('❌ [PUBLISH] Failure detected via polling:', status.error)
                     publishingLocks.delete(data.postId)
                     return { success: false, error: status.error }

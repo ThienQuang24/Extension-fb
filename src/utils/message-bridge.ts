@@ -20,6 +20,7 @@ export type MessageType =
     | 'GROUPS_SYNCED'
     | 'SYNC_FANPAGE_GROUPS'
     | 'SYNC_GROUPS_AS_ACTOR'
+    | 'PUBLISH_FANPAGE_API'
 
 export interface Message<T = any> {
     type: MessageType

@@ -43,28 +43,36 @@ export class RequestPublisher {
                 "input": {
                     "composer_entry_point": "inline_composer",
                     "composer_source_surface": "group",
-                    "composer_type": "group",
-                    "logging": {
-                        "composer_session_id": client_mutation_id
-                    },
+                    "idempotence_token": `${client_mutation_id}_GROUP`,
                     "source": "WWW",
+                    "attachments": attachments,
                     "message": {
                         "ranges": [],
                         "text": config.post.content || ""
                     },
-                    "attachments": attachments,
+                    "with_tags_ids": [],
+                    "inline_activities": [],
                     "audience": {
                         "to_id": groupId
                     },
                     "actor_id": tokens.actorId,
-                    "client_mutation_id": "1"
+                    "client_mutation_id": "1",
+                    "logging": {
+                        "composer_session_id": client_mutation_id
+                    }
                 },
+                "displayCommentsContextEnableComment": true,
+                "displayCommentsContextIsOnAndVisible": true,
                 "displayCommentsFeedbackContext": null,
                 "feedLocation": "GROUP",
                 "feedbackSource": 0,
-                "scale": 1,
+                "isComet": true,
+                "isGroup": true,
+                "isFeed": false,
+                "privacySelectorRenderLocation": "COMET_GROUP",
                 "renderLocation": "group",
-                "isGroup": true
+                "scale": 1,
+                "useDefaultActor": false
             };
 
             const params = new URLSearchParams();

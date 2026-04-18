@@ -2,6 +2,7 @@
 import { scraper } from './facebook-scraper'
 import { fanpageDetector } from './fanpage-detector'
 import { postPublisher } from './post-publisher'
+import { FanpageService } from './fanpage-service'
 import { onMessage, MessageResponse } from '@/utils/message-bridge'
 
 // Export onExecute for CRXJS loader
@@ -55,6 +56,14 @@ export function onExecute() {
 
                     case 'PUBLISH_POST':
                         response = await postPublisher.startPublish(message.data)
+                        break
+
+                    case 'PUBLISH_FANPAGE_API':
+                        response = await FanpageService.publishToPage(
+                            message.data.actorId, 
+                            message.data.content, 
+                            message.data.imageUrls
+                        )
                         break
 
                     case 'GET_PUBLISH_STATUS':
