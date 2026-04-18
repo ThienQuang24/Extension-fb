@@ -93,7 +93,7 @@ export class FanpageService {
 
             const hardcodedVariables = {
                 "input": {
-                    "composer_entry_point": "inline_composer",
+                    "composer_entry_point": "publisher_bar_media",
                     "composer_source_surface": "timeline",
                     "idempotence_token": `${sessionId}_FEED`,
                     "source": "WWW",
@@ -109,6 +109,15 @@ export class FanpageService {
                     "message": {
                         "ranges": [],
                         "text": content
+                    },
+                    "composed_text": {
+                        "block_data": ["{}"],
+                        "block_depths": [0],
+                        "block_types": [0],
+                        "blocks": [content],
+                        "entities": ["[]"],
+                        "entity_map": "{}",
+                        "inline_styles": ["[]"]
                     },
                     "with_tags_ids": null,
                     "inline_activities": [],
@@ -131,7 +140,12 @@ export class FanpageService {
                 "renderLocation": "timeline",
                 "useDefaultActor": false,
                 "isFeed": false,
-                "isTimeline": true
+                "isTimeline": true,
+                "isPageNewsFeed": true,
+                "privacySelectorRenderLocation": "COMET_STREAM",
+                "__relay_internal__pv__CometUFIShareActionMigrationrelayprovider": true,
+                "__relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider": true,
+                "__relay_internal__pv__CometUFISingleLineUFIrelayprovider": true
             };
 
             // APPLY LEARNED TEMPLATE

@@ -39,8 +39,9 @@ export class RequestPublisher {
 
             const hardcodedVariables = {
                 "input": {
-                    "composer_entry_point": "inline_composer",
+                    "composer_entry_point": "publisher_bar_media",
                     "composer_source_surface": "group",
+                    "composer_type": "group",
                     "idempotence_token": `${client_mutation_id}_GROUP`,
                     "source": "WWW",
                     "attachments": attachments,
@@ -48,8 +49,22 @@ export class RequestPublisher {
                         "ranges": [],
                         "text": config.post.content || ""
                     },
+                    "composed_text": {
+                        "block_data": ["{}"],
+                        "block_depths": [0],
+                        "block_types": [0],
+                        "blocks": [config.post.content || ""],
+                        "entities": ["[]"],
+                        "entity_map": "{}",
+                        "inline_styles": ["[]"]
+                    },
                     "with_tags_ids": null,
                     "inline_activities": [],
+                    "text_format_preset_id": "0",
+                    "group_flair": { "flair_id": null },
+                    "navigation_data": {
+                        "attribution_id_v2": `CometGroupDiscussionRoot.react,comet.group,via_cold_start,${Date.now()},124931,2361831622,,`
+                    },
                     "audience": {
                         "to_id": groupId
                     },
@@ -67,10 +82,14 @@ export class RequestPublisher {
                 "isComet": true,
                 "isGroup": true,
                 "isFeed": false,
-                "privacySelectorRenderLocation": "COMET_GROUP",
+                "isTimeline": false,
+                "privacySelectorRenderLocation": "COMET_STREAM",
                 "renderLocation": "group",
                 "scale": 1,
-                "useDefaultActor": false
+                "useDefaultActor": false,
+                "__relay_internal__pv__CometUFIShareActionMigrationrelayprovider": true,
+                "__relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider": true,
+                "__relay_internal__pv__CometUFISingleLineUFIrelayprovider": true
             };
 
             // APPLY LEARNED TEMPLATE
