@@ -768,6 +768,9 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
             return { success: false, error: 'Post or target not found' }
         }
 
+        // Resolving 'PAGE' placeholder string to actual numeric ID to fix identity mismatch errors
+        const resolvedPublisherId = (data.publisherId === 'PAGE') ? targetId : (data.publisherId || 'PERSONAL')
+
         // Apply includeAuthor setting if enabled
         const clonedPost = { ...post }
         try {
@@ -787,7 +790,8 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                 post: clonedPost,
                 fanpageUrl: targetUrl,
                 fbPageId: targetId,
-                publisherId: data.publisherId || 'PERSONAL'
+                publisherId: resolvedPublisherId,
+                targetType: data.targetType
             }
         })
 
@@ -833,7 +837,8 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
                                 post: clonedPost, 
                                 fanpageUrl: targetUrl, 
                                 fbPageId: targetId,
-                                publisherId: data.publisherId || 'PERSONAL'
+                                publisherId: resolvedPublisherId,
+                                targetType: data.targetType
                             } 
                         })
                         if (!resendResult.success) {
@@ -871,16 +876,18 @@ async function handlePublishPost(data: any, senderTabId?: number): Promise<Messa
             }
         }
 
-        publishingLocks.delete(data.postId)
+        console.log('⌛ [PUBLISH] Process timed out (180s). Releasing lock.')
         return { success: false, error: 'Publishing timed out (180s)' }
 
     } catch (error) {
-        publishingLocks.delete(data.postId)
         console.error('💥 [PUBLISH] Exception in polling loop:', error)
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown polling error'
         }
+    } finally {
+        publishingLocks.delete(data.postId)
+        console.log(`🔒 [PUBLISH] Lock released for post ${data.postId}`)
     }
 }
 

@@ -117,7 +117,7 @@ export class FacebookDatabase extends Dexie {
             // Optional: Data migration if needed
             return tx.table('schedules').toCollection().modify(s => {
                 if (!s.targetType) s.targetType = 'FANPAGE';
-                if (!s.publisherId) s.publisherId = s.fanpageId ? 'PAGE' : 'PERSONAL'; 
+                if (!s.publisherId) s.publisherId = s.fanpageId ? '61554349526342' : 'PERSONAL'; // Placeholder or actual logic
             });
         })
 
